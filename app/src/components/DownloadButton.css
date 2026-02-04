@@ -19,6 +19,10 @@
   color: var(--color-text);
 }
 
+.download-button:active:not(.disabled) {
+  transform: scale(0.98);
+}
+
 .download-button.disabled {
   opacity: 0.5;
   cursor: not-allowed;
