@@ -13,9 +13,7 @@ export default function Preview() {
 
   const isCompleted = appState === 'completed';
   const isProcessing = appState === 'processing';
-  // Handle both single URL and array of URLs (for split videos, show first part)
-  const outputUrl = Array.isArray(outputVideoUrl) ? outputVideoUrl[0] : outputVideoUrl;
-  const displayUrl = isCompleted ? outputUrl : videoUrl;
+  const displayUrl = isCompleted ? outputVideoUrl : videoUrl;
   const showVideo = displayUrl && ['ready', 'processing', 'completed'].includes(appState);
 
   useEffect(() => {

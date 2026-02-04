@@ -178,78 +178,35 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
     // Repeat for target duration using -stream_loop (no limit, faster than concat demuxer)
     const targetSeconds = targetMinutes * 60;
     const seamlessUnitDuration = videoDuration - (bridgeDuration * 0.5) + bridgeDuration;
-
-    // For videos > 30 minutes, split into parts to avoid memory limits
-    const MAX_PART_MINUTES = 30;
-    const needsSplit = targetMinutes > MAX_PART_MINUTES;
-
-    if (needsSplit) {
-      // Split into 30-minute parts
-      const numParts = Math.ceil(targetMinutes / MAX_PART_MINUTES);
-      const partDurationSeconds = MAX_PART_MINUTES * 60;
-      const outputUrls = [];
-
-      for (let part = 0; part < numParts; part++) {
-        const partFileName = `output_part${part + 1}.mp4`;
-        const partSeconds = (part === numParts - 1)
-          ? targetSeconds - (part * partDurationSeconds)
-          : partDurationSeconds;
-        const partLoopCount = Math.max(0, Math.ceil(partSeconds / seamlessUnitDuration) - 1);
-
-        await ffmpeg.exec([
-          '-stream_loop', String(partLoopCount),
-          '-i', 'seamless_unit.mp4',
-          '-t', String(partSeconds),
-          '-c', 'copy',
-          '-y',
-          partFileName
-        ]);
-
-        onProgress?.(80 + ((part + 1) / numParts) * 8);
-
-        // Read and create blob URL immediately, then delete file to free memory
-        const partData = await ffmpeg.readFile(partFileName);
-        const partBlob = new Blob([partData], { type: 'video/mp4' });
-        outputUrls.push(URL.createObjectURL(partBlob));
-        await ffmpeg.deleteFile(partFileName);
-      }
-
-      onProgress?.(90);
-      onStageChange?.('finalizing');
-
-      // Cleanup
-      const filesToDelete = [
-        inputFileName, 'bridge.mp4', 'main_part.mp4',
-        'concat_list.txt', 'seamless_unit.mp4'
-      ];
-      for (let i = 0; i < rifeResult.frames.length; i++) {
-        filesToDelete.push(`frame_${i.toString().padStart(4, '0')}.png`);
-      }
-      for (const file of filesToDelete) {
-        try { await ffmpeg.deleteFile(file); } catch { /* ignore */ }
-      }
-
-      onProgress?.(100);
-      onStageChange?.('complete');
-      lastProcessingMode = 'rife';
-
-      return outputUrls; // Return array for split videos
-    }
-
-    // Original code path for <= 30 minutes (unchanged)
     const loopCount = Math.max(0, Math.ceil(targetSeconds / seamlessUnitDuration) - 1);
 
-    // Use -stream_loop for efficient looping without concat demuxer overhead
-    // -stream_loop N loops the input N additional times (total N+1 plays)
-    // -t limits output to exact target duration
-    await ffmpeg.exec([
-      '-stream_loop', String(loopCount),
-      '-i', 'seamless_unit.mp4',
-      '-t', String(targetSeconds),
-      '-c', 'copy',
-      '-y',
-      outputFileName
-    ]);
+    // For 60min videos, use compression to reduce file size (stay within memory limits)
+    // For <=30min, use stream copy (fast, no quality loss)
+    if (targetMinutes > 30) {
+      // 60min: Re-encode with higher compression to reduce file size (~1.2GB instead of ~2.4GB)
+      await ffmpeg.exec([
+        '-stream_loop', String(loopCount),
+        '-i', 'seamless_unit.mp4',
+        '-t', String(targetSeconds),
+        '-c:v', 'libx264',
+        '-crf', '28',           // Higher compression (23=default, 28=smaller file)
+        '-preset', 'fast',
+        '-pix_fmt', 'yuv420p',
+        '-an',
+        '-y',
+        outputFileName
+      ]);
+    } else {
+      // <=30min: Stream copy (fast, no re-encoding)
+      await ffmpeg.exec([
+        '-stream_loop', String(loopCount),
+        '-i', 'seamless_unit.mp4',
+        '-t', String(targetSeconds),
+        '-c', 'copy',
+        '-y',
+        outputFileName
+      ]);
+    }
 
     onProgress?.(90);
     onStageChange?.('finalizing');
@@ -361,76 +318,37 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
     // Step 2: Fast repeat using -stream_loop (no limit, faster than concat demuxer)
     // Calculate seamless unit duration (original - blend overlap)
     const seamlessUnitDuration = videoDuration - blendDuration;
-
-    // For videos > 30 minutes, split into parts to avoid memory limits
-    const MAX_PART_MINUTES = 30;
-    const needsSplit = targetMinutes > MAX_PART_MINUTES;
-
-    if (needsSplit) {
-      // Split into 30-minute parts
-      const numParts = Math.ceil(targetMinutes / MAX_PART_MINUTES);
-      const partDurationSeconds = MAX_PART_MINUTES * 60;
-      const outputUrls = [];
-
-      updateProgress(60);
-
-      for (let part = 0; part < numParts; part++) {
-        const partFileName = `output_part${part + 1}.mp4`;
-        const partSeconds = (part === numParts - 1)
-          ? targetSeconds - (part * partDurationSeconds)
-          : partDurationSeconds;
-        const partLoopCount = Math.max(0, Math.ceil(partSeconds / seamlessUnitDuration) - 1);
-
-        await ffmpeg.exec([
-          '-stream_loop', String(partLoopCount),
-          '-i', 'seamless_unit.mp4',
-          '-t', String(partSeconds),
-          '-c', 'copy',
-          '-y',
-          partFileName
-        ]);
-
-        updateProgress(60 + ((part + 1) / numParts) * 25);
-
-        // Read and create blob URL immediately, then delete file to free memory
-        const partData = await ffmpeg.readFile(partFileName);
-        const partBlob = new Blob([partData], { type: 'video/mp4' });
-        outputUrls.push(URL.createObjectURL(partBlob));
-        await ffmpeg.deleteFile(partFileName);
-      }
-
-      updateProgress(90);
-      onStageChange?.('finalizing');
-
-      // Cleanup
-      const filesToDelete = [inputFileName, 'seamless_unit.mp4'];
-      for (const file of filesToDelete) {
-        try { await ffmpeg.deleteFile(file); } catch { /* ignore */ }
-      }
-
-      updateProgress(100);
-      onStageChange?.('complete');
-      lastProcessingMode = 'crossfade';
-
-      return outputUrls; // Return array for split videos
-    }
-
-    // Original code path for <= 30 minutes (unchanged)
     const loopCount = Math.max(0, Math.ceil(targetSeconds / seamlessUnitDuration) - 1);
 
     updateProgress(60);
 
-    // Use -stream_loop for efficient looping without concat demuxer overhead
-    // -stream_loop N loops the input N additional times (total N+1 plays)
-    // -t limits output to exact target duration
-    await ffmpeg.exec([
-      '-stream_loop', String(loopCount),
-      '-i', 'seamless_unit.mp4',
-      '-t', String(targetSeconds),
-      '-c', 'copy',
-      '-y',
-      outputFileName
-    ]);
+    // For 60min videos, use compression to reduce file size (stay within memory limits)
+    // For <=30min, use stream copy (fast, no quality loss)
+    if (targetMinutes > 30) {
+      // 60min: Re-encode with higher compression to reduce file size (~1.2GB instead of ~2.4GB)
+      await ffmpeg.exec([
+        '-stream_loop', String(loopCount),
+        '-i', 'seamless_unit.mp4',
+        '-t', String(targetSeconds),
+        '-c:v', 'libx264',
+        '-crf', '28',           // Higher compression (23=default, 28=smaller file)
+        '-preset', 'fast',
+        '-pix_fmt', 'yuv420p',
+        '-an',
+        '-y',
+        outputFileName
+      ]);
+    } else {
+      // <=30min: Stream copy (fast, no re-encoding)
+      await ffmpeg.exec([
+        '-stream_loop', String(loopCount),
+        '-i', 'seamless_unit.mp4',
+        '-t', String(targetSeconds),
+        '-c', 'copy',
+        '-y',
+        outputFileName
+      ]);
+    }
 
     updateProgress(90);
     onStageChange?.('finalizing');
