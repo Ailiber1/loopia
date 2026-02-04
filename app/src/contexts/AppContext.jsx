@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 // App States:
 // - idle: Initial state, no video uploaded
@@ -20,6 +20,7 @@ export function AppProvider({ children }) {
   const [outputVideoUrl, setOutputVideoUrl] = useState(null);
   const [error, setError] = useState(null);
   const [videoLength, setVideoLength] = useState(0);
+  const processingRef = useRef(null);
 
   const uploadVideo = useCallback((file) => {
     setAppState('uploading');
@@ -30,10 +31,18 @@ export function AppProvider({ children }) {
     const url = URL.createObjectURL(file);
     setVideoUrl(url);
 
-    // Simulate upload completion
-    setTimeout(() => {
+    // Get video duration
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      setVideoLength(video.duration);
+      URL.revokeObjectURL(video.src);
       setAppState('ready');
-    }, 1000);
+    };
+    video.onerror = () => {
+      setAppState('ready');
+    };
+    video.src = url;
   }, []);
 
   const startProcessing = useCallback(() => {
@@ -44,16 +53,23 @@ export function AppProvider({ children }) {
     setProgressStage('analyzingVideo');
     setError(null);
 
-    // Simulate processing stages
+    // Calculate processing time based on selected duration
+    // Shorter for shorter output, longer for longer output
+    const baseTime = 2000;
+    const timeMultiplier = Math.min(duration / 30, 2); // Max 2x for 60 min
+    const totalTime = baseTime * timeMultiplier;
+
+    // Processing stages with dynamic timing
     const stages = [
-      { stage: 'analyzingVideo', duration: 2000, progressEnd: 10 },
-      { stage: 'interpolatingSeams', duration: 5000, progressEnd: 40 },
-      { stage: 'generatingLoop', duration: 8000, progressEnd: 90 },
-      { stage: 'finalizing', duration: 2000, progressEnd: 100 },
+      { stage: 'analyzingVideo', duration: totalTime * 0.5, progressEnd: 10 },
+      { stage: 'interpolatingSeams', duration: totalTime * 1.5, progressEnd: 40 },
+      { stage: 'generatingLoop', duration: totalTime * 2.5, progressEnd: 90 },
+      { stage: 'finalizing', duration: totalTime * 0.5, progressEnd: 100 },
     ];
 
     let currentStage = 0;
     let currentProgress = 0;
+    let intervalId = null;
 
     const runStage = () => {
       if (currentStage >= stages.length) {
@@ -67,23 +83,41 @@ export function AppProvider({ children }) {
       const stage = stages[currentStage];
       setProgressStage(stage.stage);
 
-      const progressIncrement = (stage.progressEnd - currentProgress) / (stage.duration / 100);
-      const progressInterval = setInterval(() => {
-        currentProgress += progressIncrement;
+      const steps = stage.duration / 100;
+      const progressPerStep = (stage.progressEnd - currentProgress) / (stage.duration / 100);
+
+      intervalId = setInterval(() => {
+        currentProgress += progressPerStep;
         if (currentProgress >= stage.progressEnd) {
           currentProgress = stage.progressEnd;
-          clearInterval(progressInterval);
+          clearInterval(intervalId);
           currentStage++;
           setTimeout(runStage, 100);
         }
         setProgress(Math.min(Math.round(currentProgress), 100));
       }, 100);
+
+      processingRef.current = intervalId;
     };
 
     runStage();
-  }, [appState, videoUrl]);
+  }, [appState, videoUrl, duration]);
+
+  const cancelProcessing = useCallback(() => {
+    if (processingRef.current) {
+      clearInterval(processingRef.current);
+      processingRef.current = null;
+    }
+    setAppState('ready');
+    setProgress(0);
+    setProgressStage('');
+  }, []);
 
   const resetApp = useCallback(() => {
+    if (processingRef.current) {
+      clearInterval(processingRef.current);
+      processingRef.current = null;
+    }
     if (videoUrl) {
       URL.revokeObjectURL(videoUrl);
     }
@@ -131,6 +165,7 @@ export function AppProvider({ children }) {
         setVideoLength,
         uploadVideo,
         startProcessing,
+        cancelProcessing,
         resetApp,
         setErrorState,
         retryFromError,

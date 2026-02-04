@@ -1,24 +1,29 @@
 .start-button {
   width: 100%;
   padding: 16px 24px;
-  background-color: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-accent) 0%, #e67a35 100%);
   color: #1a1a1a;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  border-radius: var(--border-radius);
+  border-radius: 12px;
   transition: all var(--transition);
+  box-shadow: 0 4px 12px rgba(255, 140, 66, 0.3);
 }
 
 .start-button:hover:not(:disabled) {
-  background-color: var(--color-accent-hover);
+  background: linear-gradient(135deg, var(--color-accent-hover) 0%, var(--color-accent) 100%);
+  box-shadow: 0 6px 16px rgba(255, 140, 66, 0.4);
+  transform: translateY(-1px);
 }
 
 .start-button:disabled {
-  background-color: var(--color-surface-light);
+  background: var(--color-surface-light);
   color: var(--color-text-dim);
+  box-shadow: none;
 }
 
 .start-button.processing {
-  background-color: var(--color-surface-light);
+  background: var(--color-surface-light);
   color: var(--color-text-muted);
+  box-shadow: none;
 }
