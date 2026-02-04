@@ -130,11 +130,20 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
     // Create bridge video from frames
     const bridgeDuration = 0.5;
     const fps = Math.max(rifeResult.frames.length / bridgeDuration, 10);
+    const targetSeconds = targetMinutes * 60;
+    const needsCompression = targetMinutes > 30;
+
+    // For 60min: compress during seamless_unit creation (short video = fast)
+    // Then use -c copy for loop expansion (no re-encoding of 60min video)
+    const compressionArgs = needsCompression
+      ? ['-crf', '28']  // Compress to reduce final file size (~1.2GB for 60min)
+      : [];
 
     await ffmpeg.exec([
       '-framerate', String(fps),
       '-i', 'frame_%04d.png',
       '-c:v', 'libx264',
+      ...compressionArgs,
       '-preset', 'fast',
       '-pix_fmt', 'yuv420p',
       '-y',
@@ -151,6 +160,7 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
       '-i', inputFileName,
       '-t', String(mainEnd),
       '-c:v', 'libx264',
+      ...compressionArgs,
       '-preset', 'fast',
       '-an',
       '-y',
@@ -175,39 +185,20 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
 
     onProgress?.(80);
 
-    // Repeat for target duration using -stream_loop (no limit, faster than concat demuxer)
-    const targetSeconds = targetMinutes * 60;
+    // Repeat for target duration using -stream_loop
     const seamlessUnitDuration = videoDuration - (bridgeDuration * 0.5) + bridgeDuration;
     const loopCount = Math.max(0, Math.ceil(targetSeconds / seamlessUnitDuration) - 1);
 
-    // For 60min videos, downscale to 720p to reduce file size (stay within memory limits)
-    // For <=30min, use stream copy (fast, no quality loss)
-    if (targetMinutes > 30) {
-      // 60min: Downscale to 720p + good quality (~1.0GB for 60min)
-      await ffmpeg.exec([
-        '-stream_loop', String(loopCount),
-        '-i', 'seamless_unit.mp4',
-        '-t', String(targetSeconds),
-        '-vf', 'scale=-2:720',    // Downscale to 720p (keeps aspect ratio)
-        '-c:v', 'libx264',
-        '-crf', '23',             // Good quality at 720p
-        '-preset', 'fast',
-        '-pix_fmt', 'yuv420p',
-        '-an',
-        '-y',
-        outputFileName
-      ]);
-    } else {
-      // <=30min: Stream copy (fast, no re-encoding)
-      await ffmpeg.exec([
-        '-stream_loop', String(loopCount),
-        '-i', 'seamless_unit.mp4',
-        '-t', String(targetSeconds),
-        '-c', 'copy',
-        '-y',
-        outputFileName
-      ]);
-    }
+    // Always use stream copy for loop expansion (fast)
+    // Compression was already applied during seamless_unit creation for 60min
+    await ffmpeg.exec([
+      '-stream_loop', String(loopCount),
+      '-i', 'seamless_unit.mp4',
+      '-t', String(targetSeconds),
+      '-c', 'copy',
+      '-y',
+      outputFileName
+    ]);
 
     onProgress?.(90);
     onStageChange?.('finalizing');
@@ -287,10 +278,15 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
     // Short blend duration for faster processing
     const blendDuration = Math.min(BLEND_DURATION, videoDuration * 0.1);
     const targetSeconds = targetMinutes * 60;
+    const needsCompression = targetMinutes > 30;
+
+    // For 60min: compress during seamless_unit creation (short video = fast)
+    // Then use -c copy for loop expansion (no re-encoding of 60min video)
+    const crfValue = needsCompression ? '28' : '23';
 
     updateProgress(20);
 
-    // Step 1: Create seamless unit with xfade (fast encoding)
+    // Step 1: Create seamless unit with xfade
     const xfadeOffset = videoDuration - blendDuration;
 
     await ffmpeg.exec([
@@ -305,7 +301,7 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
       '-map', '[out]',
       '-c:v', 'libx264',
       '-preset', 'ultrafast',
-      '-crf', '23',
+      '-crf', crfValue,
       '-pix_fmt', 'yuv420p',
       '-an',
       '-y',
@@ -316,41 +312,22 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
 
     onStageChange?.('generatingLoop');
 
-    // Step 2: Fast repeat using -stream_loop (no limit, faster than concat demuxer)
-    // Calculate seamless unit duration (original - blend overlap)
+    // Step 2: Fast repeat using -stream_loop (always use -c copy for speed)
+    // Compression was already applied during seamless_unit creation for 60min
     const seamlessUnitDuration = videoDuration - blendDuration;
     const loopCount = Math.max(0, Math.ceil(targetSeconds / seamlessUnitDuration) - 1);
 
     updateProgress(60);
 
-    // For 60min videos, downscale to 720p to reduce file size (stay within memory limits)
-    // For <=30min, use stream copy (fast, no quality loss)
-    if (targetMinutes > 30) {
-      // 60min: Downscale to 720p + good quality (~1.0GB for 60min)
-      await ffmpeg.exec([
-        '-stream_loop', String(loopCount),
-        '-i', 'seamless_unit.mp4',
-        '-t', String(targetSeconds),
-        '-vf', 'scale=-2:720',    // Downscale to 720p (keeps aspect ratio)
-        '-c:v', 'libx264',
-        '-crf', '23',             // Good quality at 720p
-        '-preset', 'fast',
-        '-pix_fmt', 'yuv420p',
-        '-an',
-        '-y',
-        outputFileName
-      ]);
-    } else {
-      // <=30min: Stream copy (fast, no re-encoding)
-      await ffmpeg.exec([
-        '-stream_loop', String(loopCount),
-        '-i', 'seamless_unit.mp4',
-        '-t', String(targetSeconds),
-        '-c', 'copy',
-        '-y',
-        outputFileName
-      ]);
-    }
+    // Always use stream copy for loop expansion (fast)
+    await ffmpeg.exec([
+      '-stream_loop', String(loopCount),
+      '-i', 'seamless_unit.mp4',
+      '-t', String(targetSeconds),
+      '-c', 'copy',
+      '-y',
+      outputFileName
+    ]);
 
     updateProgress(90);
     onStageChange?.('finalizing');
