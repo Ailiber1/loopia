@@ -3,8 +3,8 @@
   width: 100%;
   height: 100%;
   min-height: 400px;
-  background-color: var(--color-surface);
-  border-radius: var(--border-radius);
+  background-color: #252525;
+  border-radius: 16px;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -13,14 +13,14 @@
 
 .info-button {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 32px;
-  height: 32px;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   color: var(--color-text-muted);
   z-index: 10;
@@ -29,7 +29,13 @@
 
 .info-button:hover {
   color: var(--color-text);
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.info-button svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.5;
 }
 
 .video-wrapper {
@@ -44,20 +50,20 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background-color: #000;
+  background-color: #1a1a1a;
   flex: 1;
 }
 
 .seam-jump-button {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  width: 40px;
-  height: 40px;
+  top: 16px;
+  left: 16px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
   border-radius: 50%;
   color: var(--color-text);
   z-index: 10;
@@ -65,8 +71,13 @@
 }
 
 .seam-jump-button:hover {
-  background: rgba(255, 140, 66, 0.8);
-  color: #fff;
+  background: var(--color-accent);
+  color: #1a1a1a;
+}
+
+.seam-jump-button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .play-overlay {
@@ -74,7 +85,7 @@
   top: 0;
   left: 0;
   right: 0;
-  bottom: 60px;
+  bottom: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,20 +93,27 @@
 }
 
 .play-button {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
   border-radius: 50%;
   color: #fff;
   transition: all var(--transition);
 }
 
+.play-button svg {
+  width: 28px;
+  height: 28px;
+  margin-left: 4px;
+}
+
 .play-overlay:hover .play-button {
-  background: rgba(255, 140, 66, 0.8);
-  transform: scale(1.1);
+  background: var(--color-accent);
+  color: #1a1a1a;
+  transform: scale(1.05);
 }
 
 .video-controls {
@@ -106,19 +124,24 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  padding: 16px 20px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
 }
 
 .control-button {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: none;
   color: #fff;
   transition: all var(--transition);
+}
+
+.control-button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .control-button:hover {
@@ -129,14 +152,16 @@
   flex: 1;
   height: 4px;
   position: relative;
+  cursor: pointer;
 }
 
 .progress-bar-bg {
   width: 100%;
   height: 100%;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 2px;
   position: relative;
+  overflow: hidden;
 }
 
 .progress-bar-fill {
@@ -156,6 +181,7 @@
   transform: translate(-50%, -50%);
   opacity: 0;
   transition: opacity var(--transition);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .progress-container:hover .progress-handle {
@@ -163,10 +189,10 @@
 }
 
 .time-display {
-  font-size: 12px;
-  color: var(--color-text);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
   font-variant-numeric: tabular-nums;
-  min-width: 90px;
+  min-width: 85px;
   text-align: right;
 }
 
@@ -181,5 +207,11 @@
 
 .placeholder-content {
   color: var(--color-text-dim);
-  opacity: 0.5;
+  opacity: 0.3;
+}
+
+.placeholder-content svg {
+  width: 80px;
+  height: 80px;
+  stroke-width: 0.5;
 }

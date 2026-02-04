@@ -4,6 +4,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: var(--color-bg);
 }
 
 /* Header */
@@ -11,24 +12,25 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 20px 32px;
+  background: transparent;
 }
 
 .logo {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--color-accent);
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   margin: 0;
+  text-transform: uppercase;
 }
 
 /* Main Layout */
 .main {
   flex: 1;
   display: flex;
-  padding: 24px;
-  gap: 24px;
+  padding: 0 32px 32px;
+  gap: 32px;
   max-width: 1400px;
   width: 100%;
   margin: 0 auto;
@@ -36,22 +38,23 @@
 
 /* Controls Panel (Left) */
 .controls-panel {
-  width: 200px;
-  min-width: 200px;
+  width: 180px;
+  min-width: 180px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  padding-top: 8px;
 }
 
 .controls-content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .controls-footer {
   margin-top: auto;
-  padding-top: 16px;
+  padding-top: 24px;
 }
 
 /* Preview Panel (Right) */
@@ -59,12 +62,34 @@
   flex: 1;
   position: relative;
   min-height: 500px;
+  display: flex;
 }
 
 /* Responsive Design */
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
+  .main {
+    padding: 0 24px 24px;
+    gap: 24px;
+  }
+
+  .header {
+    padding: 16px 24px;
+  }
+
+  .controls-panel {
+    width: 170px;
+    min-width: 170px;
+  }
+}
+
+@media (max-width: 768px) {
   .main {
     flex-direction: column;
+    padding: 0 16px 16px;
+    gap: 16px;
+  }
+
+  .header {
     padding: 16px;
   }
 
@@ -73,49 +98,55 @@
     min-width: 100%;
     flex-direction: row;
     flex-wrap: wrap;
+    gap: 12px;
   }
 
   .controls-content {
     flex-direction: row;
     flex-wrap: wrap;
     width: 100%;
+    gap: 12px;
   }
 
   .controls-content > * {
-    flex: 1;
-    min-width: 150px;
+    flex: 1 1 calc(50% - 6px);
+    min-width: 140px;
   }
 
   .controls-footer {
     margin-top: 0;
     padding-top: 0;
     margin-left: auto;
+    display: flex;
+    align-items: center;
   }
 
   .preview-panel {
-    min-height: 400px;
+    min-height: 350px;
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 480px) {
   .header {
     padding: 12px 16px;
   }
 
   .logo {
-    font-size: 20px;
+    font-size: 22px;
+    letter-spacing: 2px;
   }
 
   .main {
-    padding: 12px;
+    padding: 0 12px 12px;
     gap: 12px;
   }
 
   .controls-content > * {
+    flex: 1 1 100%;
     min-width: 100%;
   }
 
   .preview-panel {
-    min-height: 300px;
+    min-height: 280px;
   }
 }
