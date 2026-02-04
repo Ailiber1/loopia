@@ -106,6 +106,32 @@
   height: 18px;
 }
 
+.cancel-processing-button {
+  position: absolute;
+  top: 16px;
+  right: 56px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  color: var(--color-text);
+  z-index: 10;
+  transition: all var(--transition);
+}
+
+.cancel-processing-button:hover {
+  background: #ff4444;
+  color: #fff;
+}
+
+.cancel-processing-button svg {
+  width: 18px;
+  height: 18px;
+}
+
 .play-overlay {
   position: absolute;
   top: 0;
