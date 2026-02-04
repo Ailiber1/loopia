@@ -102,6 +102,7 @@ export function AppProvider({ children }) {
       );
 
       if (!abortController.signal.aborted) {
+        // Handle both single URL (string) and multiple URLs (array) for split videos
         setOutputVideoUrl(outputUrl);
         setAppState('completed');
         setProgressStage('complete');
@@ -142,8 +143,13 @@ export function AppProvider({ children }) {
     if (videoUrl) {
       URL.revokeObjectURL(videoUrl);
     }
-    if (outputVideoUrl && outputVideoUrl !== videoUrl) {
-      URL.revokeObjectURL(outputVideoUrl);
+    // Handle both single URL and array of URLs (for split videos)
+    if (outputVideoUrl) {
+      if (Array.isArray(outputVideoUrl)) {
+        outputVideoUrl.forEach(url => URL.revokeObjectURL(url));
+      } else if (outputVideoUrl !== videoUrl) {
+        URL.revokeObjectURL(outputVideoUrl);
+      }
     }
     setAppState('idle');
     setVideoFile(null);
