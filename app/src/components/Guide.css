@@ -1,0 +1,266 @@
+.guide-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guide-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.guide-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.guide-modal {
+  background: #1a1a1a;
+  border-radius: 16px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.guide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.guide-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #fff;
+}
+
+.guide-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.guide-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.guide-content {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.guide-section {
+  margin-bottom: 28px;
+}
+
+.guide-section:last-child {
+  margin-bottom: 0;
+}
+
+.guide-section h3 {
+  font-size: 16px;
+  color: #f97316;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.3);
+}
+
+.guide-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.guide-icon {
+  font-size: 20px;
+}
+
+.guide-label {
+  color: rgba(255, 255, 255, 0.7);
+  flex: 1;
+}
+
+.guide-value {
+  color: #fff;
+  font-weight: 600;
+}
+
+.guide-table-wrapper {
+  overflow-x: auto;
+}
+
+.guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.guide-table th,
+.guide-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.guide-table th {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.guide-table td {
+  color: #fff;
+}
+
+.guide-table tr:last-child td {
+  border-bottom: none;
+}
+
+.guide-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 500px) {
+  .guide-comparison {
+    grid-template-columns: 1fr;
+  }
+}
+
+.guide-good,
+.guide-bad {
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.guide-good {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.guide-bad {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.guide-good h4,
+.guide-bad h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.guide-good h4 {
+  color: #22c55e;
+}
+
+.guide-bad h4 {
+  color: #ef4444;
+}
+
+.guide-good ul,
+.guide-bad ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.guide-good li,
+.guide-bad li {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.guide-good li:last-child,
+.guide-bad li:last-child {
+  margin-bottom: 0;
+}
+
+.guide-examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.guide-example {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.guide-example-icon {
+  font-size: 28px;
+}
+
+.guide-example-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guide-example-text strong {
+  color: #fff;
+  font-size: 13px;
+}
+
+.guide-example-text span {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+}
+
+.guide-note {
+  margin: 12px 0 0 0;
+  padding: 12px;
+  background: rgba(249, 115, 22, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  border-left: 3px solid #f97316;
+}
