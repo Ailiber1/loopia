@@ -234,7 +234,7 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
   }
 }
 
-// Create seamless loop with crossfade blend
+// Create seamless loop with crossfade blend (single-pass approach)
 async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStageChange, onProgress, onModeChange) {
   const ffmpeg = await getFFmpeg((p) => {
     if (onProgress) onProgress(Math.min(p * 0.1, 10));
@@ -265,103 +265,62 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
 
     onStageChange?.('interpolatingSeams');
 
-    // Blend duration - longer for smoother transition
+    // Blend duration for smooth crossfade
     const blendDuration = Math.min(BLEND_DURATION, videoDuration * 0.15);
     const targetSeconds = targetMinutes * 60;
     const repeatCount = Math.ceil(targetSeconds / videoDuration);
 
     onProgress?.(25);
 
-    // Create part A: from start to (end - blendDuration)
-    const partAEnd = videoDuration - blendDuration;
+    // Create seamless loop unit using xfade in single pass
+    // This avoids concat discontinuities by processing everything together
+    const xfadeOffset = videoDuration - blendDuration;
+
     await ffmpeg.exec([
       '-i', inputFileName,
-      '-t', String(partAEnd),
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '18',
-      '-an',
-      '-y',
-      'part_a.mp4'
-    ]);
-
-    onProgress?.(35);
-
-    // Create part B: last blendDuration seconds (for crossfade out)
-    await ffmpeg.exec([
       '-i', inputFileName,
-      '-ss', String(videoDuration - blendDuration),
-      '-t', String(blendDuration),
+      '-filter_complex',
+      `[0:v]trim=0:${xfadeOffset},setpts=PTS-STARTPTS[main];` +
+      `[0:v]trim=${xfadeOffset}:${videoDuration},setpts=PTS-STARTPTS[end];` +
+      `[1:v]trim=0:${blendDuration},setpts=PTS-STARTPTS[start];` +
+      `[end][start]xfade=transition=fade:duration=${blendDuration}:offset=0[blend];` +
+      `[main][blend]concat=n=2:v=1:a=0[out]`,
+      '-map', '[out]',
       '-c:v', 'libx264',
       '-preset', 'fast',
       '-crf', '18',
+      '-pix_fmt', 'yuv420p',
       '-an',
-      '-y',
-      'part_b.mp4'
-    ]);
-
-    onProgress?.(45);
-
-    // Create part C: first blendDuration seconds (for crossfade in)
-    await ffmpeg.exec([
-      '-i', inputFileName,
-      '-t', String(blendDuration),
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '18',
-      '-an',
-      '-y',
-      'part_c.mp4'
-    ]);
-
-    onProgress?.(55);
-
-    // Apply xfade crossfade between part_b (end) and part_c (start)
-    await ffmpeg.exec([
-      '-i', 'part_b.mp4',
-      '-i', 'part_c.mp4',
-      '-filter_complex', `xfade=transition=fade:duration=${blendDuration}:offset=0`,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '18',
-      '-an',
-      '-y',
-      'crossfade.mp4'
-    ]);
-
-    onProgress?.(70);
-
-    onStageChange?.('generatingLoop');
-
-    // Concatenate: part_a + crossfade
-    await ffmpeg.writeFile('loop_list.txt',
-      new TextEncoder().encode("file 'part_a.mp4'\nfile 'crossfade.mp4'\n")
-    );
-
-    await ffmpeg.exec([
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', 'loop_list.txt',
-      '-c', 'copy',
       '-y',
       'seamless_unit.mp4'
     ]);
 
-    onProgress?.(80);
+    onProgress?.(60);
 
-    // Repeat for target duration
+    onStageChange?.('generatingLoop');
+
+    // Repeat for target duration using stream copy (fast)
     if (repeatCount > 1) {
-      let concatList = '';
+      // Re-encode all copies into single file to avoid concat issues
+      let filterInputs = '';
+      let filterConcat = '';
+      const inputArgs = [];
+
       for (let i = 0; i < repeatCount; i++) {
-        concatList += "file 'seamless_unit.mp4'\n";
+        inputArgs.push('-i', 'seamless_unit.mp4');
+        filterInputs += `[${i}:v]`;
       }
-      await ffmpeg.writeFile('final_list.txt', new TextEncoder().encode(concatList));
+      filterConcat = `${filterInputs}concat=n=${repeatCount}:v=1:a=0[out]`;
 
       await ffmpeg.exec([
-        '-f', 'concat',
-        '-safe', '0',
-        '-i', 'final_list.txt',
-        '-c', 'copy',
+        ...inputArgs,
+        '-filter_complex', filterConcat,
+        '-map', '[out]',
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '18',
+        '-pix_fmt', 'yuv420p',
+        '-an',
         '-y',
         outputFileName
       ]);
@@ -380,11 +339,7 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
     const outputData = await ffmpeg.readFile(outputFileName);
 
     // Cleanup
-    const filesToDelete = [
-      inputFileName, 'part_a.mp4', 'part_b.mp4', 'part_c.mp4',
-      'crossfade.mp4', 'loop_list.txt',
-      'seamless_unit.mp4', 'final_list.txt', outputFileName
-    ];
+    const filesToDelete = [inputFileName, 'seamless_unit.mp4', outputFileName];
 
     for (const file of filesToDelete) {
       try { await ffmpeg.deleteFile(file); } catch { /* ignore */ }
