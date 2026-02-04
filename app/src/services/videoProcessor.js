@@ -6,8 +6,9 @@ let ffmpegInstance = null;
 let isLoading = false;
 let loadPromise = null;
 
-// Crossfade duration in seconds
-const CROSSFADE_DURATION = 0.5;
+// Interpolation settings
+const BRIDGE_DURATION = 0.5; // Duration of the bridge section in seconds
+const INTERPOLATION_FPS = 30; // Frame rate for interpolation
 
 // Get or create FFmpeg instance
 async function getFFmpeg(onProgress) {
@@ -55,34 +56,28 @@ async function loadFFmpeg(onProgress) {
   return ffmpeg;
 }
 
-// Create a seamless loop video with crossfade
+// Create a seamless loop video with motion interpolation (no transition effects)
 export async function createSeamlessLoop(videoFile, targetMinutes, onStageChange, onProgress) {
   const ffmpeg = await getFFmpeg((p) => {
-    // Progress during FFmpeg loading
-    if (onProgress) onProgress(Math.min(p * 0.1, 10)); // 0-10% for loading
+    if (onProgress) onProgress(Math.min(p * 0.1, 10));
   });
 
   try {
-    // Stage 1: Analyzing video
     onStageChange?.('analyzingVideo');
     onProgress?.(10);
 
-    // Write input file to FFmpeg virtual filesystem
     const inputFileName = 'input.mp4';
     const outputFileName = 'output.mp4';
 
     await ffmpeg.writeFile(inputFileName, await fetchFile(videoFile));
     onProgress?.(15);
 
-    // Get video duration using ffprobe-like approach
-    // We'll use the duration passed or estimate it
+    // Get video duration
     const video = document.createElement('video');
     video.preload = 'metadata';
 
     const videoDuration = await new Promise((resolve, reject) => {
-      video.onloadedmetadata = () => {
-        resolve(video.duration);
-      };
+      video.onloadedmetadata = () => resolve(video.duration);
       video.onerror = () => reject(new Error('Failed to load video metadata'));
       video.src = URL.createObjectURL(videoFile);
     });
@@ -90,76 +85,140 @@ export async function createSeamlessLoop(videoFile, targetMinutes, onStageChange
     URL.revokeObjectURL(video.src);
     onProgress?.(20);
 
-    // Stage 2: Creating seamless loop with crossfade
     onStageChange?.('interpolatingSeams');
 
-    // Calculate loop parameters
-    const crossfadeDuration = Math.min(CROSSFADE_DURATION, videoDuration * 0.1);
-    const loopUnitDuration = videoDuration; // Original video becomes the loop unit
+    const bridgeDuration = Math.min(BRIDGE_DURATION, videoDuration * 0.15);
 
-    // Calculate how many times to repeat for target duration
+    // Calculate repeat count
     const targetSeconds = targetMinutes * 60;
-    const repeatCount = Math.ceil(targetSeconds / loopUnitDuration);
+    const repeatCount = Math.ceil(targetSeconds / videoDuration);
+    const maxRepeats = Math.min(repeatCount, 10);
 
-    // For very long durations, we'll create a reasonable loop unit
-    // and let the user play it on loop in their video player
-    const maxRepeats = Math.min(repeatCount, 10); // Limit to prevent memory issues
+    onProgress?.(25);
+
+    // Step 1: Extract the last segment (last bridgeDuration seconds)
+    const lastSegmentStart = videoDuration - bridgeDuration;
+    await ffmpeg.exec([
+      '-i', inputFileName,
+      '-ss', String(lastSegmentStart),
+      '-t', String(bridgeDuration),
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-an',
+      '-y',
+      'last_segment.mp4'
+    ]);
 
     onProgress?.(30);
 
-    // Create the seamless loop using FFmpeg filters
-    // Strategy: Create crossfade between end and beginning
-
-    // Step 1: Split video and create crossfade
-    // We'll create: [original video without last 0.5s] + [crossfade of last 0.5s to first 0.5s]
-
-    const trimEnd = videoDuration - crossfadeDuration;
-
-    // Create seamless loop unit with crossfade filter
-    // This filter creates a smooth transition from end to beginning
+    // Step 2: Extract the first segment (first bridgeDuration seconds)
     await ffmpeg.exec([
       '-i', inputFileName,
-      '-filter_complex',
-      `[0:v]split=2[main][fade];` +
-      `[main]trim=0:${trimEnd},setpts=PTS-STARTPTS[trimmed];` +
-      `[fade]trim=${trimEnd}:${videoDuration},setpts=PTS-STARTPTS[end];` +
-      `[0:v]trim=0:${crossfadeDuration},setpts=PTS-STARTPTS[start];` +
-      `[end][start]xfade=transition=fade:duration=${crossfadeDuration}:offset=0[xfaded];` +
-      `[trimmed][xfaded]concat=n=2:v=1:a=0[outv]`,
-      '-map', '[outv]',
+      '-t', String(bridgeDuration),
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-an',
+      '-y',
+      'first_segment.mp4'
+    ]);
+
+    onProgress?.(35);
+
+    // Step 3: Concatenate last + first to create bridge source
+    await ffmpeg.writeFile('bridge_list.txt',
+      new TextEncoder().encode("file 'last_segment.mp4'\nfile 'first_segment.mp4'\n")
+    );
+
+    await ffmpeg.exec([
+      '-f', 'concat',
+      '-safe', '0',
+      '-i', 'bridge_list.txt',
+      '-c', 'copy',
+      '-y',
+      'bridge_source.mp4'
+    ]);
+
+    onProgress?.(40);
+
+    // Step 4: Apply minterpolate to generate smooth intermediate frames
+    // This uses motion estimation to create new frames between end and start
+    await ffmpeg.exec([
+      '-i', 'bridge_source.mp4',
+      '-vf', `minterpolate=fps=${INTERPOLATION_FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1`,
       '-c:v', 'libx264',
       '-preset', 'fast',
       '-crf', '23',
+      '-an',
+      '-y',
+      'bridge_interpolated.mp4'
+    ]);
+
+    onProgress?.(55);
+
+    // Step 5: Extract only the middle part (the actual interpolated transition)
+    // Skip the first bridgeDuration and take bridgeDuration from middle
+    await ffmpeg.exec([
+      '-i', 'bridge_interpolated.mp4',
+      '-ss', String(bridgeDuration * 0.5),
+      '-t', String(bridgeDuration),
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-an',
+      '-y',
+      'bridge_final.mp4'
+    ]);
+
+    onProgress?.(60);
+
+    // Step 6: Extract main video (without the last bridgeDuration/2 seconds)
+    const mainEnd = videoDuration - (bridgeDuration * 0.5);
+    await ffmpeg.exec([
+      '-i', inputFileName,
+      '-t', String(mainEnd),
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-an',
+      '-y',
+      'main_part.mp4'
+    ]);
+
+    onProgress?.(70);
+
+    onStageChange?.('generatingLoop');
+
+    // Step 7: Create the seamless loop unit
+    await ffmpeg.writeFile('loop_list.txt',
+      new TextEncoder().encode("file 'main_part.mp4'\nfile 'bridge_final.mp4'\n")
+    );
+
+    await ffmpeg.exec([
+      '-f', 'concat',
+      '-safe', '0',
+      '-i', 'loop_list.txt',
+      '-c', 'copy',
       '-y',
       'seamless_unit.mp4'
     ]);
 
-    onProgress?.(50);
-    onStageChange?.('generatingLoop');
+    onProgress?.(80);
 
-    // Step 2: If we need multiple repeats, concatenate the seamless unit
+    // Step 8: Repeat for target duration if needed
     if (maxRepeats > 1) {
-      // Create concat file list
       let concatList = '';
       for (let i = 0; i < maxRepeats; i++) {
-        concatList += `file 'seamless_unit.mp4'\n`;
+        concatList += "file 'seamless_unit.mp4'\n";
       }
+      await ffmpeg.writeFile('final_list.txt', new TextEncoder().encode(concatList));
 
-      await ffmpeg.writeFile('concat.txt', new TextEncoder().encode(concatList));
-
-      onProgress?.(60);
-
-      // Concatenate multiple loops
       await ffmpeg.exec([
         '-f', 'concat',
         '-safe', '0',
-        '-i', 'concat.txt',
+        '-i', 'final_list.txt',
         '-c', 'copy',
         '-y',
         outputFileName
       ]);
     } else {
-      // Just rename the seamless unit
       await ffmpeg.exec([
         '-i', 'seamless_unit.mp4',
         '-c', 'copy',
@@ -171,23 +230,27 @@ export async function createSeamlessLoop(videoFile, targetMinutes, onStageChange
     onProgress?.(90);
     onStageChange?.('finalizing');
 
-    // Read the output file
     const outputData = await ffmpeg.readFile(outputFileName);
 
-    // Clean up virtual filesystem
-    try {
-      await ffmpeg.deleteFile(inputFileName);
-      await ffmpeg.deleteFile('seamless_unit.mp4');
-      await ffmpeg.deleteFile(outputFileName);
-      await ffmpeg.deleteFile('concat.txt').catch(() => {});
-    } catch {
-      // Ignore cleanup errors
+    // Cleanup
+    const filesToDelete = [
+      inputFileName, 'last_segment.mp4', 'first_segment.mp4',
+      'bridge_list.txt', 'bridge_source.mp4', 'bridge_interpolated.mp4',
+      'bridge_final.mp4', 'main_part.mp4', 'loop_list.txt',
+      'seamless_unit.mp4', 'final_list.txt', outputFileName
+    ];
+
+    for (const file of filesToDelete) {
+      try {
+        await ffmpeg.deleteFile(file);
+      } catch {
+        // Ignore
+      }
     }
 
     onProgress?.(100);
     onStageChange?.('complete');
 
-    // Create blob URL for the output
     const blob = new Blob([outputData], { type: 'video/mp4' });
     return URL.createObjectURL(blob);
 
@@ -197,9 +260,8 @@ export async function createSeamlessLoop(videoFile, targetMinutes, onStageChange
   }
 }
 
-// Simpler approach: Create crossfade loop using Canvas + MediaRecorder
-// This is a fallback if FFmpeg.wasm fails
-export async function createCanvasLoop(videoFile, targetMinutes, onStageChange, onProgress) {
+// Fallback: Simple loop without interpolation (Canvas method)
+export async function createSimpleLoop(videoFile, targetMinutes, onStageChange, onProgress) {
   onStageChange?.('analyzingVideo');
   onProgress?.(5);
 
@@ -220,15 +282,13 @@ export async function createCanvasLoop(videoFile, targetMinutes, onStageChange, 
   const height = video.videoHeight || 720;
 
   onProgress?.(10);
-  onStageChange?.('interpolatingSeams');
+  onStageChange?.('generatingLoop');
 
-  // Create canvas for rendering
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
 
-  // Setup MediaRecorder
   const stream = canvas.captureStream(30);
   const mediaRecorder = new MediaRecorder(stream, {
     mimeType: 'video/webm;codecs=vp9',
@@ -240,13 +300,11 @@ export async function createCanvasLoop(videoFile, targetMinutes, onStageChange, 
     if (e.data.size > 0) chunks.push(e.data);
   };
 
-  const crossfadeDuration = Math.min(0.5, duration * 0.1);
-  const targetDuration = Math.min(targetMinutes * 60, duration * 5); // Limit for browser
+  const targetDuration = Math.min(targetMinutes * 60, duration * 5);
   const loopsNeeded = Math.ceil(targetDuration / duration);
-  const actualLoops = Math.min(loopsNeeded, 3); // Limit loops for browser performance
+  const actualLoops = Math.min(loopsNeeded, 3);
 
   onProgress?.(20);
-  onStageChange?.('generatingLoop');
 
   return new Promise((resolve, reject) => {
     let currentLoop = 0;
@@ -263,26 +321,11 @@ export async function createCanvasLoop(videoFile, targetMinutes, onStageChange, 
       reject(err);
     };
 
-    // Start recording
     mediaRecorder.start();
 
     const renderFrame = () => {
       if (recordingComplete) return;
-
       ctx.drawImage(video, 0, 0, width, height);
-
-      // Apply crossfade at loop boundaries
-      const timeInLoop = video.currentTime;
-      const timeUntilEnd = duration - timeInLoop;
-
-      if (timeUntilEnd < crossfadeDuration && currentLoop < actualLoops - 1) {
-        // We're near the end, start fading
-        const fadeProgress = 1 - (timeUntilEnd / crossfadeDuration);
-        ctx.globalAlpha = fadeProgress * 0.3; // Subtle fade effect
-        // The next frame will blend naturally due to video loop
-      } else {
-        ctx.globalAlpha = 1;
-      }
     };
 
     video.ontimeupdate = () => {
@@ -308,7 +351,6 @@ export async function createCanvasLoop(videoFile, targetMinutes, onStageChange, 
       reject(new Error('Video playback error'));
     };
 
-    // Render loop
     const animate = () => {
       if (!recordingComplete) {
         renderFrame();
@@ -326,17 +368,17 @@ export function isFFmpegSupported() {
   return typeof SharedArrayBuffer !== 'undefined';
 }
 
-// Main processing function that chooses the best method
+// Main processing function
 export async function processVideo(videoFile, targetMinutes, onStageChange, onProgress) {
   if (isFFmpegSupported()) {
     try {
       return await createSeamlessLoop(videoFile, targetMinutes, onStageChange, onProgress);
     } catch (error) {
-      console.warn('FFmpeg processing failed, falling back to Canvas method:', error);
-      return await createCanvasLoop(videoFile, targetMinutes, onStageChange, onProgress);
+      console.warn('FFmpeg processing failed, falling back to simple method:', error);
+      return await createSimpleLoop(videoFile, targetMinutes, onStageChange, onProgress);
     }
   } else {
-    console.log('SharedArrayBuffer not available, using Canvas method');
-    return await createCanvasLoop(videoFile, targetMinutes, onStageChange, onProgress);
+    console.log('SharedArrayBuffer not available, using simple method');
+    return await createSimpleLoop(videoFile, targetMinutes, onStageChange, onProgress);
   }
 }
