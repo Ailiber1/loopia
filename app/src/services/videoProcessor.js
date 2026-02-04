@@ -8,8 +8,8 @@ let isLoading = false;
 let loadPromise = null;
 
 // Interpolation settings
-const BRIDGE_DURATION = 0.5;
-const INTERPOLATION_FPS = 30;
+const BRIDGE_DURATION = 0.3;
+const INTERPOLATION_FPS = 24;
 
 // Processing mode tracking
 let lastProcessingMode = null;
@@ -176,9 +176,9 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
 
     onProgress?.(80);
 
-    // Repeat for target duration
+    // Repeat for target duration (no limit)
     const targetSeconds = targetMinutes * 60;
-    const repeatCount = Math.min(Math.ceil(targetSeconds / videoDuration), 10);
+    const repeatCount = Math.ceil(targetSeconds / videoDuration);
 
     if (repeatCount > 1) {
       let concatList = '';
@@ -266,10 +266,9 @@ async function createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onSt
 
     onStageChange?.('interpolatingSeams');
 
-    const bridgeDuration = Math.min(BRIDGE_DURATION, videoDuration * 0.15);
+    const bridgeDuration = Math.min(BRIDGE_DURATION, videoDuration * 0.1);
     const targetSeconds = targetMinutes * 60;
     const repeatCount = Math.ceil(targetSeconds / videoDuration);
-    const maxRepeats = Math.min(repeatCount, 10);
 
     onProgress?.(25);
 
@@ -317,13 +316,13 @@ async function createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onSt
 
     onProgress?.(40);
 
-    // Apply minterpolate
+    // Apply minterpolate with simpler settings for stability
     await ffmpeg.exec([
       '-i', 'bridge_source.mp4',
-      '-vf', `minterpolate=fps=${INTERPOLATION_FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1`,
+      '-vf', `minterpolate=fps=${INTERPOLATION_FPS}:mi_mode=blend`,
       '-c:v', 'libx264',
       '-preset', 'fast',
-      '-crf', '23',
+      '-crf', '18',
       '-an',
       '-y',
       'bridge_interpolated.mp4'
@@ -378,9 +377,9 @@ async function createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onSt
     onProgress?.(80);
 
     // Repeat for target duration
-    if (maxRepeats > 1) {
+    if (repeatCount > 1) {
       let concatList = '';
-      for (let i = 0; i < maxRepeats; i++) {
+      for (let i = 0; i < repeatCount; i++) {
         concatList += "file 'seamless_unit.mp4'\n";
       }
       await ffmpeg.writeFile('final_list.txt', new TextEncoder().encode(concatList));
