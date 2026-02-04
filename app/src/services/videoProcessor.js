@@ -8,7 +8,7 @@ let isLoading = false;
 let loadPromise = null;
 
 // Interpolation settings
-const BLEND_DURATION = 1.0; // 1 second crossfade for smooth transition
+const BLEND_DURATION = 0.5; // Shorter blend for faster processing
 
 // Processing mode tracking
 let lastProcessingMode = null;
@@ -234,22 +234,35 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
   }
 }
 
-// Create seamless loop with crossfade blend (single-pass approach)
+// Create seamless loop - optimized for speed
 async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStageChange, onProgress, onModeChange) {
-  const ffmpeg = await getFFmpeg((p) => {
-    if (onProgress) onProgress(Math.min(p * 0.1, 10));
+  let currentProgress = 0;
+  const updateProgress = (value) => {
+    currentProgress = value;
+    onProgress?.(Math.round(value));
+  };
+
+  const ffmpeg = await getFFmpeg(() => {});
+
+  // Set up FFmpeg progress handler
+  ffmpeg.on('progress', ({ progress }) => {
+    if (typeof progress === 'number' && progress > 0) {
+      // Map FFmpeg progress to current stage progress range
+      const stageProgress = currentProgress + (progress * 20);
+      onProgress?.(Math.round(Math.min(stageProgress, 95)));
+    }
   });
 
   try {
     onStageChange?.('analyzingVideo');
-    onProgress?.(10);
+    updateProgress(5);
     onModeChange?.('minterpolate');
 
     const inputFileName = 'input.mp4';
     const outputFileName = 'output.mp4';
 
     await ffmpeg.writeFile(inputFileName, await fetchFile(videoFile));
-    onProgress?.(15);
+    updateProgress(10);
 
     const video = document.createElement('video');
     video.preload = 'metadata';
@@ -261,19 +274,21 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
     });
 
     URL.revokeObjectURL(video.src);
-    onProgress?.(20);
+    updateProgress(15);
 
     onStageChange?.('interpolatingSeams');
 
-    // Blend duration for smooth crossfade
-    const blendDuration = Math.min(BLEND_DURATION, videoDuration * 0.15);
+    // Short blend duration for faster processing
+    const blendDuration = Math.min(BLEND_DURATION, videoDuration * 0.1);
     const targetSeconds = targetMinutes * 60;
     const repeatCount = Math.ceil(targetSeconds / videoDuration);
 
-    onProgress?.(25);
+    // Limit repeat count for reasonable processing time
+    const maxRepeats = Math.min(repeatCount, 20);
 
-    // Create seamless loop unit using xfade in single pass
-    // This avoids concat discontinuities by processing everything together
+    updateProgress(20);
+
+    // Step 1: Create seamless unit with xfade (fast encoding)
     const xfadeOffset = videoDuration - blendDuration;
 
     await ffmpeg.exec([
@@ -287,40 +302,34 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
       `[main][blend]concat=n=2:v=1:a=0[out]`,
       '-map', '[out]',
       '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '18',
+      '-preset', 'ultrafast',
+      '-crf', '23',
       '-pix_fmt', 'yuv420p',
       '-an',
       '-y',
       'seamless_unit.mp4'
     ]);
 
-    onProgress?.(60);
+    updateProgress(50);
 
     onStageChange?.('generatingLoop');
 
-    // Repeat for target duration using stream copy (fast)
-    if (repeatCount > 1) {
-      // Re-encode all copies into single file to avoid concat issues
-      let filterInputs = '';
-      let filterConcat = '';
-      const inputArgs = [];
-
-      for (let i = 0; i < repeatCount; i++) {
-        inputArgs.push('-i', 'seamless_unit.mp4');
-        filterInputs += `[${i}:v]`;
+    // Step 2: Fast repeat using concat demuxer with stream copy
+    if (maxRepeats > 1) {
+      let concatList = '';
+      for (let i = 0; i < maxRepeats; i++) {
+        concatList += "file 'seamless_unit.mp4'\n";
       }
-      filterConcat = `${filterInputs}concat=n=${repeatCount}:v=1:a=0[out]`;
+      await ffmpeg.writeFile('concat_list.txt', new TextEncoder().encode(concatList));
 
+      updateProgress(60);
+
+      // Use stream copy - much faster than re-encoding
       await ffmpeg.exec([
-        ...inputArgs,
-        '-filter_complex', filterConcat,
-        '-map', '[out]',
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '18',
-        '-pix_fmt', 'yuv420p',
-        '-an',
+        '-f', 'concat',
+        '-safe', '0',
+        '-i', 'concat_list.txt',
+        '-c', 'copy',
         '-y',
         outputFileName
       ]);
@@ -333,19 +342,19 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
       ]);
     }
 
-    onProgress?.(90);
+    updateProgress(90);
     onStageChange?.('finalizing');
 
     const outputData = await ffmpeg.readFile(outputFileName);
 
     // Cleanup
-    const filesToDelete = [inputFileName, 'seamless_unit.mp4', outputFileName];
+    const filesToDelete = [inputFileName, 'seamless_unit.mp4', 'concat_list.txt', outputFileName];
 
     for (const file of filesToDelete) {
       try { await ffmpeg.deleteFile(file); } catch { /* ignore */ }
     }
 
-    onProgress?.(100);
+    updateProgress(100);
     onStageChange?.('complete');
     lastProcessingMode = 'crossfade';
 
