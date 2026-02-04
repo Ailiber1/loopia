@@ -1,0 +1,63 @@
+.error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: var(--border-radius);
+}
+
+.error-content {
+  text-align: center;
+  padding: 32px;
+  max-width: 300px;
+}
+
+.error-icon {
+  color: #f1c40f;
+  margin-bottom: 16px;
+}
+
+.error-message {
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.error-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.error-button {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--border-radius);
+  transition: all var(--transition);
+}
+
+.error-button.retry {
+  background-color: var(--color-accent);
+  color: #1a1a1a;
+}
+
+.error-button.retry:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.error-button.cancel {
+  background-color: var(--color-surface-light);
+  color: var(--color-text);
+}
+
+.error-button.cancel:hover {
+  background-color: #454545;
+}
