@@ -5,7 +5,7 @@ import './Preview.css';
 
 export default function Preview() {
   const videoRef = useRef(null);
-  const { appState, videoUrl, outputVideoUrl, videoLength, setVideoLength, progress } = useApp();
+  const { appState, videoUrl, outputVideoUrl, videoLength, setVideoLength, progress, resetApp } = useApp();
   const { t } = useLanguage();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -132,7 +132,7 @@ export default function Preview() {
             <div className="processing-overlay">
               <div className="processing-indicator">
                 <div className="processing-spinner"></div>
-                <span className="processing-text">{progress}%</span>
+                <span className="processing-text">{Math.round(progress)}%</span>
               </div>
             </div>
           )}
@@ -149,6 +149,20 @@ export default function Preview() {
                 <path d="M3 11V9a4 4 0 0 1 4-4h14" />
                 <polyline points="7 23 3 19 7 15" />
                 <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              </svg>
+            </button>
+          )}
+
+          {/* Delete button (only for completed state) */}
+          {isCompleted && (
+            <button
+              className="delete-video-button"
+              onClick={resetApp}
+              title={t('delete')}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           )}
