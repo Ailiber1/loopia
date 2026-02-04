@@ -180,16 +180,17 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
     const seamlessUnitDuration = videoDuration - (bridgeDuration * 0.5) + bridgeDuration;
     const loopCount = Math.max(0, Math.ceil(targetSeconds / seamlessUnitDuration) - 1);
 
-    // For 60min videos, use compression to reduce file size (stay within memory limits)
+    // For 60min videos, downscale to 720p to reduce file size (stay within memory limits)
     // For <=30min, use stream copy (fast, no quality loss)
     if (targetMinutes > 30) {
-      // 60min: Re-encode with higher compression to reduce file size (~1.2GB instead of ~2.4GB)
+      // 60min: Downscale to 720p + good quality (~1.0GB for 60min)
       await ffmpeg.exec([
         '-stream_loop', String(loopCount),
         '-i', 'seamless_unit.mp4',
         '-t', String(targetSeconds),
+        '-vf', 'scale=-2:720',    // Downscale to 720p (keeps aspect ratio)
         '-c:v', 'libx264',
-        '-crf', '27',           // Higher compression (~1.5GB for 60min)
+        '-crf', '23',             // Good quality at 720p
         '-preset', 'fast',
         '-pix_fmt', 'yuv420p',
         '-an',
@@ -322,16 +323,17 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
 
     updateProgress(60);
 
-    // For 60min videos, use compression to reduce file size (stay within memory limits)
+    // For 60min videos, downscale to 720p to reduce file size (stay within memory limits)
     // For <=30min, use stream copy (fast, no quality loss)
     if (targetMinutes > 30) {
-      // 60min: Re-encode with higher compression to reduce file size (~1.2GB instead of ~2.4GB)
+      // 60min: Downscale to 720p + good quality (~1.0GB for 60min)
       await ffmpeg.exec([
         '-stream_loop', String(loopCount),
         '-i', 'seamless_unit.mp4',
         '-t', String(targetSeconds),
+        '-vf', 'scale=-2:720',    // Downscale to 720p (keeps aspect ratio)
         '-c:v', 'libx264',
-        '-crf', '27',           // Higher compression (~1.5GB for 60min)
+        '-crf', '23',             // Good quality at 720p
         '-preset', 'fast',
         '-pix_fmt', 'yuv420p',
         '-an',
