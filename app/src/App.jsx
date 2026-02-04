@@ -9,6 +9,7 @@ import Preview from './components/Preview';
 import ProgressBar from './components/ProgressBar';
 import LanguageToggle from './components/LanguageToggle';
 import ErrorDisplay from './components/ErrorDisplay';
+import Guide from './components/Guide';
 import './styles/global.css';
 import './App.css';
 
@@ -18,7 +19,10 @@ function AppContent() {
       {/* Header */}
       <header className="header">
         <h1 className="logo">LOOPIA</h1>
-        <LanguageToggle />
+        <div className="header-actions">
+          <Guide />
+          <LanguageToggle />
+        </div>
       </header>
 
       {/* Main Content */}
