@@ -1,6 +1,6 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { interpolateWithRife, isRifeApiAvailable } from './rifeApi';
+import { createRifeBridge, isRifeOnnxAvailable } from './rifeOnnx';
 
 // Singleton FFmpeg instance
 let ffmpegInstance = null;
@@ -59,8 +59,8 @@ async function loadFFmpeg(onProgress) {
   return ffmpeg;
 }
 
-// Create seamless loop with RIFE AI interpolation
-async function createSeamlessLoopWithRife(videoFile, targetMinutes, onStageChange, onProgress, onModeChange) {
+// Create seamless loop with RIFE AI interpolation (ONNX - runs in browser)
+async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageChange, onProgress, onModeChange) {
   const ffmpeg = await getFFmpeg((p) => {
     if (onProgress) onProgress(Math.min(p * 0.05, 5));
   });
@@ -68,6 +68,7 @@ async function createSeamlessLoopWithRife(videoFile, targetMinutes, onStageChang
   try {
     onStageChange?.('analyzingVideo');
     onProgress?.(5);
+    onModeChange?.('rife');
 
     const inputFileName = 'input.mp4';
     const outputFileName = 'output.mp4';
@@ -88,22 +89,39 @@ async function createSeamlessLoopWithRife(videoFile, targetMinutes, onStageChang
     onProgress?.(10);
 
     onStageChange?.('interpolatingSeams');
-    onModeChange?.('rife');
 
-    // Call RIFE API for frame interpolation
-    const rifeResult = await interpolateWithRife(videoFile, (p) => {
-      onProgress?.(10 + p * 0.4); // 10-50%
+    // Create RIFE bridge using ONNX (in-browser AI)
+    const rifeResult = await createRifeBridge(videoFile, (stage, p) => {
+      if (stage === 'loading_model' || stage === 'downloading_model') {
+        onProgress?.(10 + (p * 0.2)); // 10-30%
+      } else if (stage === 'interpolating') {
+        onProgress?.(30 + (p * 0.2)); // 30-50%
+      }
     });
 
     onProgress?.(50);
 
-    // Download interpolated frames and create bridge video
-    const frameUrls = Array.isArray(rifeResult.frames) ? rifeResult.frames : [rifeResult.frames];
+    // Convert interpolated frames to video
+    const canvas = document.createElement('canvas');
+    canvas.width = rifeResult.originalWidth;
+    canvas.height = rifeResult.originalHeight;
+    const ctx = canvas.getContext('2d');
 
-    // Create bridge video from interpolated frames
-    for (let i = 0; i < frameUrls.length; i++) {
-      const response = await fetch(frameUrls[i]);
-      const blob = await response.blob();
+    // Write frames to FFmpeg
+    for (let i = 0; i < rifeResult.frames.length; i++) {
+      // Scale frame to original size
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = rifeResult.width;
+      frameCanvas.height = rifeResult.height;
+      const frameCtx = frameCanvas.getContext('2d');
+      frameCtx.putImageData(rifeResult.frames[i], 0, 0);
+
+      // Draw scaled to output canvas
+      ctx.drawImage(frameCanvas, 0, 0, rifeResult.width, rifeResult.height,
+                    0, 0, rifeResult.originalWidth, rifeResult.originalHeight);
+
+      // Convert to PNG and write to FFmpeg
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
       const arrayBuffer = await blob.arrayBuffer();
       await ffmpeg.writeFile(`frame_${i.toString().padStart(4, '0')}.png`, new Uint8Array(arrayBuffer));
     }
@@ -112,10 +130,10 @@ async function createSeamlessLoopWithRife(videoFile, targetMinutes, onStageChang
 
     // Create bridge video from frames
     const bridgeDuration = 0.5;
-    const fps = frameUrls.length / bridgeDuration;
+    const fps = Math.max(rifeResult.frames.length / bridgeDuration, 10);
 
     await ffmpeg.exec([
-      '-framerate', String(Math.max(fps, 10)),
+      '-framerate', String(fps),
       '-i', 'frame_%04d.png',
       '-c:v', 'libx264',
       '-preset', 'fast',
@@ -128,7 +146,7 @@ async function createSeamlessLoopWithRife(videoFile, targetMinutes, onStageChang
 
     onStageChange?.('generatingLoop');
 
-    // Trim main video (remove last portion that will be replaced by bridge)
+    // Trim main video
     const mainEnd = videoDuration - (bridgeDuration * 0.5);
     await ffmpeg.exec([
       '-i', inputFileName,
@@ -196,7 +214,7 @@ async function createSeamlessLoopWithRife(videoFile, targetMinutes, onStageChang
       inputFileName, 'bridge.mp4', 'main_part.mp4',
       'concat_list.txt', 'seamless_unit.mp4', 'final_list.txt', outputFileName
     ];
-    for (let i = 0; i < frameUrls.length; i++) {
+    for (let i = 0; i < rifeResult.frames.length; i++) {
       filesToDelete.push(`frame_${i.toString().padStart(4, '0')}.png`);
     }
 
@@ -212,7 +230,7 @@ async function createSeamlessLoopWithRife(videoFile, targetMinutes, onStageChang
     return URL.createObjectURL(blob);
 
   } catch (error) {
-    console.error('RIFE processing error:', error);
+    console.error('RIFE ONNX processing error:', error);
     throw error;
   }
 }
@@ -424,39 +442,33 @@ export function getLastProcessingMode() {
   return lastProcessingMode;
 }
 
-// Check if RIFE is available
-export function isRifeAvailable() {
-  return isRifeApiAvailable();
+// Check if RIFE ONNX is available
+export async function isRifeAvailable() {
+  return await isRifeOnnxAvailable();
 }
 
-// Main processing function with RIFE priority and fallback
+// Main processing function with RIFE ONNX priority and fallback
 export async function processVideo(videoFile, targetMinutes, onStageChange, onProgress, onModeChange) {
   if (!isFFmpegSupported()) {
     throw new Error('SharedArrayBuffer not supported');
   }
 
-  // Try RIFE first if available
-  if (isRifeApiAvailable()) {
+  // Check if RIFE ONNX is available (WebGPU or WebGL)
+  const rifeAvailable = await isRifeOnnxAvailable();
+
+  if (rifeAvailable) {
     try {
-      console.log('Attempting RIFE AI interpolation...');
-      return await createSeamlessLoopWithRife(videoFile, targetMinutes, onStageChange, onProgress, onModeChange);
+      console.log('Attempting RIFE ONNX interpolation (in-browser AI)...');
+      return await createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageChange, onProgress, onModeChange);
     } catch (error) {
-      console.warn('RIFE failed, falling back to minterpolate:', error.message);
-
-      // Notify about fallback
-      if (error.message === 'RATE_LIMIT_EXCEEDED') {
-        onModeChange?.('fallback_rate_limit');
-      } else {
-        onModeChange?.('fallback_error');
-      }
-
-      // Fallback to minterpolate
+      console.warn('RIFE ONNX failed, falling back to minterpolate:', error.message);
+      onModeChange?.('fallback_error');
       return await createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onStageChange, onProgress, onModeChange);
     }
   }
 
-  // No RIFE API key, use minterpolate directly
-  console.log('RIFE not available, using minterpolate...');
-  onModeChange?.('minterpolate_no_api');
+  // No RIFE available, use minterpolate directly
+  console.log('RIFE ONNX not available, using minterpolate...');
+  onModeChange?.('minterpolate_no_webgpu');
   return await createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onStageChange, onProgress, onModeChange);
 }
