@@ -2,12 +2,12 @@ import { createContext, useContext, useState, useCallback } from 'react';
 
 const translations = {
   ja: {
-    upload: 'Upload',
+    upload: 'アップロード',
     uploading: 'アップロード中...',
-    duration: 'Duration',
-    startLoop: 'Start Loop',
+    duration: '再生時間',
+    startLoop: 'ループ開始',
     processing: '生成中…',
-    download: 'Download',
+    download: 'ダウンロード',
     delete: '削除',
     cancel: 'キャンセル',
     confirmCancel: '処理を中止しますか？',
@@ -17,7 +17,7 @@ const translations = {
     generatingLoop: 'ループ生成中...',
     finalizing: '最終処理中...',
     complete: '完了',
-    generatingSeamlessLoop: 'Generating seamless loop...',
+    generatingSeamlessLoop: 'シームレスループ生成中...',
     estimatedTime: '推定残り時間',
     aboutMinutes: '約{min}分',
     unsupportedFormat: '対応していない形式です',
