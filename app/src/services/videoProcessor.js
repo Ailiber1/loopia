@@ -8,8 +8,7 @@ let isLoading = false;
 let loadPromise = null;
 
 // Interpolation settings
-const BRIDGE_DURATION = 0.3;
-const INTERPOLATION_FPS = 24;
+const BLEND_DURATION = 1.0; // 1 second crossfade for smooth transition
 
 // Processing mode tracking
 let lastProcessingMode = null;
@@ -235,8 +234,8 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
   }
 }
 
-// Create seamless loop with minterpolate (fallback)
-async function createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onStageChange, onProgress, onModeChange) {
+// Create seamless loop with crossfade blend
+async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStageChange, onProgress, onModeChange) {
   const ffmpeg = await getFFmpeg((p) => {
     if (onProgress) onProgress(Math.min(p * 0.1, 10));
   });
@@ -266,103 +265,77 @@ async function createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onSt
 
     onStageChange?.('interpolatingSeams');
 
-    const bridgeDuration = Math.min(BRIDGE_DURATION, videoDuration * 0.1);
+    // Blend duration - longer for smoother transition
+    const blendDuration = Math.min(BLEND_DURATION, videoDuration * 0.15);
     const targetSeconds = targetMinutes * 60;
     const repeatCount = Math.ceil(targetSeconds / videoDuration);
 
     onProgress?.(25);
 
-    // Extract last segment
-    const lastSegmentStart = videoDuration - bridgeDuration;
+    // Create part A: from start to (end - blendDuration)
+    const partAEnd = videoDuration - blendDuration;
     await ffmpeg.exec([
       '-i', inputFileName,
-      '-ss', String(lastSegmentStart),
-      '-t', String(bridgeDuration),
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-an',
-      '-y',
-      'last_segment.mp4'
-    ]);
-
-    onProgress?.(30);
-
-    // Extract first segment
-    await ffmpeg.exec([
-      '-i', inputFileName,
-      '-t', String(bridgeDuration),
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-an',
-      '-y',
-      'first_segment.mp4'
-    ]);
-
-    onProgress?.(35);
-
-    // Concatenate last + first
-    await ffmpeg.writeFile('bridge_list.txt',
-      new TextEncoder().encode("file 'last_segment.mp4'\nfile 'first_segment.mp4'\n")
-    );
-
-    await ffmpeg.exec([
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', 'bridge_list.txt',
-      '-c', 'copy',
-      '-y',
-      'bridge_source.mp4'
-    ]);
-
-    onProgress?.(40);
-
-    // Apply minterpolate with simpler settings for stability
-    await ffmpeg.exec([
-      '-i', 'bridge_source.mp4',
-      '-vf', `minterpolate=fps=${INTERPOLATION_FPS}:mi_mode=blend`,
+      '-t', String(partAEnd),
       '-c:v', 'libx264',
       '-preset', 'fast',
       '-crf', '18',
       '-an',
       '-y',
-      'bridge_interpolated.mp4'
+      'part_a.mp4'
+    ]);
+
+    onProgress?.(35);
+
+    // Create part B: last blendDuration seconds (for crossfade out)
+    await ffmpeg.exec([
+      '-i', inputFileName,
+      '-ss', String(videoDuration - blendDuration),
+      '-t', String(blendDuration),
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-crf', '18',
+      '-an',
+      '-y',
+      'part_b.mp4'
+    ]);
+
+    onProgress?.(45);
+
+    // Create part C: first blendDuration seconds (for crossfade in)
+    await ffmpeg.exec([
+      '-i', inputFileName,
+      '-t', String(blendDuration),
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-crf', '18',
+      '-an',
+      '-y',
+      'part_c.mp4'
     ]);
 
     onProgress?.(55);
 
-    // Extract middle part
+    // Apply xfade crossfade between part_b (end) and part_c (start)
     await ffmpeg.exec([
-      '-i', 'bridge_interpolated.mp4',
-      '-ss', String(bridgeDuration * 0.5),
-      '-t', String(bridgeDuration),
+      '-i', 'part_b.mp4',
+      '-i', 'part_c.mp4',
+      '-filter_complex', `xfade=transition=fade:duration=${blendDuration}:offset=0`,
       '-c:v', 'libx264',
       '-preset', 'fast',
+      '-crf', '18',
       '-an',
       '-y',
-      'bridge_final.mp4'
-    ]);
-
-    onProgress?.(60);
-
-    // Extract main video
-    const mainEnd = videoDuration - (bridgeDuration * 0.5);
-    await ffmpeg.exec([
-      '-i', inputFileName,
-      '-t', String(mainEnd),
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-an',
-      '-y',
-      'main_part.mp4'
+      'crossfade.mp4'
     ]);
 
     onProgress?.(70);
 
     onStageChange?.('generatingLoop');
 
-    // Create seamless loop unit
+    // Concatenate: part_a + crossfade
     await ffmpeg.writeFile('loop_list.txt',
-      new TextEncoder().encode("file 'main_part.mp4'\nfile 'bridge_final.mp4'\n")
+      new TextEncoder().encode("file 'part_a.mp4'\nfile 'crossfade.mp4'\n")
     );
 
     await ffmpeg.exec([
@@ -408,9 +381,8 @@ async function createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onSt
 
     // Cleanup
     const filesToDelete = [
-      inputFileName, 'last_segment.mp4', 'first_segment.mp4',
-      'bridge_list.txt', 'bridge_source.mp4', 'bridge_interpolated.mp4',
-      'bridge_final.mp4', 'main_part.mp4', 'loop_list.txt',
+      inputFileName, 'part_a.mp4', 'part_b.mp4', 'part_c.mp4',
+      'crossfade.mp4', 'loop_list.txt',
       'seamless_unit.mp4', 'final_list.txt', outputFileName
     ];
 
@@ -420,13 +392,13 @@ async function createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onSt
 
     onProgress?.(100);
     onStageChange?.('complete');
-    lastProcessingMode = 'minterpolate';
+    lastProcessingMode = 'crossfade';
 
     const blob = new Blob([outputData], { type: 'video/mp4' });
     return URL.createObjectURL(blob);
 
   } catch (error) {
-    console.error('Minterpolate processing error:', error);
+    console.error('Crossfade processing error:', error);
     throw error;
   }
 }
@@ -462,12 +434,12 @@ export async function processVideo(videoFile, targetMinutes, onStageChange, onPr
     } catch (error) {
       console.warn('RIFE ONNX failed, falling back to minterpolate:', error.message);
       onModeChange?.('fallback_error');
-      return await createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onStageChange, onProgress, onModeChange);
+      return await createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStageChange, onProgress, onModeChange);
     }
   }
 
   // No RIFE available, use minterpolate directly
   console.log('RIFE ONNX not available, using minterpolate...');
   onModeChange?.('minterpolate_no_webgpu');
-  return await createSeamlessLoopWithMinterpolate(videoFile, targetMinutes, onStageChange, onProgress, onModeChange);
+  return await createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStageChange, onProgress, onModeChange);
 }
