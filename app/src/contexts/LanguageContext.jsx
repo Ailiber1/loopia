@@ -31,6 +31,13 @@ const translations = {
     retry: '再試行',
     checkSeams: '繋ぎ目確認',
     min: '分',
+    // Processing modes
+    modeRife: 'AI補間モード (RIFE)',
+    modeMinterpolate: '通常補間モード',
+    rateLimitReached: 'AI補間の月間上限に達しました。通常補間モードで処理しています。',
+    rifeFallback: 'AI補間でエラーが発生しました。通常補間モードで処理しています。',
+    usingAiInterpolation: 'AI補間で処理中...',
+    usingStandardInterpolation: '通常補間で処理中...',
   },
   en: {
     upload: 'Upload',
@@ -62,6 +69,13 @@ const translations = {
     retry: 'Retry',
     checkSeams: 'Check seams',
     min: 'min',
+    // Processing modes
+    modeRife: 'AI Interpolation (RIFE)',
+    modeMinterpolate: 'Standard Interpolation',
+    rateLimitReached: 'AI interpolation monthly limit reached. Processing with standard interpolation.',
+    rifeFallback: 'AI interpolation error. Processing with standard interpolation.',
+    usingAiInterpolation: 'Processing with AI interpolation...',
+    usingStandardInterpolation: 'Processing with standard interpolation...',
   },
 };
 

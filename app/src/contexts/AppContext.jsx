@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { processVideo } from '../services/videoProcessor';
+import { processVideo, isRifeAvailable } from '../services/videoProcessor';
 
 // App States:
 // - idle: Initial state, no video uploaded
@@ -21,12 +21,15 @@ export function AppProvider({ children }) {
   const [outputVideoUrl, setOutputVideoUrl] = useState(null);
   const [error, setError] = useState(null);
   const [videoLength, setVideoLength] = useState(0);
+  const [processingMode, setProcessingMode] = useState(null); // 'rife' or 'minterpolate'
+  const [notification, setNotification] = useState(null); // For mode switch notifications
   const processingRef = useRef(null);
 
   const uploadVideo = useCallback((file) => {
     setAppState('uploading');
     setVideoFile(file);
     setError(null);
+    setNotification(null);
 
     // Create local URL for preview
     const url = URL.createObjectURL(file);
@@ -53,13 +56,15 @@ export function AppProvider({ children }) {
     setProgress(0);
     setProgressStage('analyzingVideo');
     setError(null);
+    setNotification(null);
+    setProcessingMode(null);
 
     // Store abort controller for cancellation
     const abortController = new AbortController();
     processingRef.current = abortController;
 
     try {
-      // Use actual video processing
+      // Use actual video processing with mode change callback
       const outputUrl = await processVideo(
         videoFile,
         duration,
@@ -71,6 +76,24 @@ export function AppProvider({ children }) {
         (progressValue) => {
           if (!abortController.signal.aborted) {
             setProgress(progressValue);
+          }
+        },
+        (mode) => {
+          if (!abortController.signal.aborted) {
+            // Handle mode changes
+            if (mode === 'rife') {
+              setProcessingMode('rife');
+            } else if (mode === 'minterpolate') {
+              setProcessingMode('minterpolate');
+            } else if (mode === 'fallback_rate_limit') {
+              setProcessingMode('minterpolate');
+              setNotification('rateLimitReached');
+            } else if (mode === 'fallback_error') {
+              setProcessingMode('minterpolate');
+              setNotification('rifeFallback');
+            } else if (mode === 'minterpolate_no_api') {
+              setProcessingMode('minterpolate');
+            }
           }
         }
       );
@@ -91,7 +114,6 @@ export function AppProvider({ children }) {
 
   const cancelProcessing = useCallback(() => {
     if (processingRef.current) {
-      // Handle both AbortController and interval-based cancellation
       if (processingRef.current.abort) {
         processingRef.current.abort();
       } else if (typeof processingRef.current === 'number') {
@@ -102,6 +124,7 @@ export function AppProvider({ children }) {
     setAppState('ready');
     setProgress(0);
     setProgressStage('');
+    setProcessingMode(null);
   }, []);
 
   const resetApp = useCallback(() => {
@@ -128,6 +151,8 @@ export function AppProvider({ children }) {
     setOutputVideoUrl(null);
     setError(null);
     setVideoLength(0);
+    setProcessingMode(null);
+    setNotification(null);
   }, [videoUrl, outputVideoUrl]);
 
   const setErrorState = useCallback((errorMessage) => {
@@ -137,12 +162,17 @@ export function AppProvider({ children }) {
 
   const retryFromError = useCallback(() => {
     setError(null);
+    setNotification(null);
     if (videoFile) {
       setAppState('ready');
     } else {
       setAppState('idle');
     }
   }, [videoFile]);
+
+  const clearNotification = useCallback(() => {
+    setNotification(null);
+  }, []);
 
   return (
     <AppContext.Provider
@@ -158,12 +188,16 @@ export function AppProvider({ children }) {
         error,
         videoLength,
         setVideoLength,
+        processingMode,
+        notification,
+        isRifeAvailable: isRifeAvailable(),
         uploadVideo,
         startProcessing,
         cancelProcessing,
         resetApp,
         setErrorState,
         retryFromError,
+        clearNotification,
       }}
     >
       {children}
