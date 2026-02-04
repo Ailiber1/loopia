@@ -1,0 +1,26 @@
+.download-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 24px;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--color-border);
+  transition: all var(--transition);
+}
+
+.download-button:hover {
+  background-color: var(--color-surface-light);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.download-icon {
+  display: flex;
+  align-items: center;
+}
