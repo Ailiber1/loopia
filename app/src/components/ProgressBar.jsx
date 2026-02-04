@@ -43,7 +43,7 @@ export default function ProgressBar() {
       <div className="progress-track">
         <div
           className="progress-fill"
-          style={{ width: `${progress}%` }}
+          style={{ width: `${Math.round(progress)}%` }}
         />
       </div>
 
@@ -51,7 +51,7 @@ export default function ProgressBar() {
         <span className="estimated-time">
           {t('estimatedTime')}: {getEstimatedTime()}
         </span>
-        <span className="progress-percent">{progress}%</span>
+        <span className="progress-percent">{Math.round(progress)}%</span>
       </div>
     </div>
   );
