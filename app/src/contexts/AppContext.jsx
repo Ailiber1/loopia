@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { processVideo } from '../services/videoProcessor';
 
 // App States:
 // - idle: Initial state, no video uploaded
@@ -45,67 +46,57 @@ export function AppProvider({ children }) {
     video.src = url;
   }, []);
 
-  const startProcessing = useCallback(() => {
-    if (appState !== 'ready') return;
+  const startProcessing = useCallback(async () => {
+    if (appState !== 'ready' || !videoFile) return;
 
     setAppState('processing');
     setProgress(0);
     setProgressStage('analyzingVideo');
     setError(null);
 
-    // Calculate processing time based on selected duration
-    // Shorter for shorter output, longer for longer output
-    const baseTime = 2000;
-    const timeMultiplier = Math.min(duration / 30, 2); // Max 2x for 60 min
-    const totalTime = baseTime * timeMultiplier;
+    // Store abort controller for cancellation
+    const abortController = new AbortController();
+    processingRef.current = abortController;
 
-    // Processing stages with dynamic timing
-    const stages = [
-      { stage: 'analyzingVideo', duration: totalTime * 0.5, progressEnd: 10 },
-      { stage: 'interpolatingSeams', duration: totalTime * 1.5, progressEnd: 40 },
-      { stage: 'generatingLoop', duration: totalTime * 2.5, progressEnd: 90 },
-      { stage: 'finalizing', duration: totalTime * 0.5, progressEnd: 100 },
-    ];
+    try {
+      // Use actual video processing
+      const outputUrl = await processVideo(
+        videoFile,
+        duration,
+        (stage) => {
+          if (!abortController.signal.aborted) {
+            setProgressStage(stage);
+          }
+        },
+        (progressValue) => {
+          if (!abortController.signal.aborted) {
+            setProgress(progressValue);
+          }
+        }
+      );
 
-    let currentStage = 0;
-    let currentProgress = 0;
-    let intervalId = null;
-
-    const runStage = () => {
-      if (currentStage >= stages.length) {
+      if (!abortController.signal.aborted) {
+        setOutputVideoUrl(outputUrl);
         setAppState('completed');
         setProgressStage('complete');
-        // Use original video as output for MVP (no actual processing)
-        setOutputVideoUrl(videoUrl);
-        return;
       }
-
-      const stage = stages[currentStage];
-      setProgressStage(stage.stage);
-
-      const steps = stage.duration / 100;
-      const progressPerStep = (stage.progressEnd - currentProgress) / (stage.duration / 100);
-
-      intervalId = setInterval(() => {
-        currentProgress += progressPerStep;
-        if (currentProgress >= stage.progressEnd) {
-          currentProgress = stage.progressEnd;
-          clearInterval(intervalId);
-          currentStage++;
-          setTimeout(runStage, 100);
-        }
-        setProgress(Math.min(Math.round(currentProgress), 100));
-      }, 100);
-
-      processingRef.current = intervalId;
-    };
-
-    runStage();
-  }, [appState, videoUrl, duration]);
+    } catch (err) {
+      if (!abortController.signal.aborted) {
+        console.error('Processing error:', err);
+        setError('processingFailed');
+        setAppState('error');
+      }
+    }
+  }, [appState, videoFile, duration]);
 
   const cancelProcessing = useCallback(() => {
     if (processingRef.current) {
-      clearInterval(processingRef.current);
+      // Handle both AbortController and interval-based cancellation
+      if (processingRef.current.abort) {
+        processingRef.current.abort();
+      } else if (typeof processingRef.current === 'number') {
+        clearInterval(processingRef.current);
+      }
       processingRef.current = null;
     }
     setAppState('ready');
@@ -115,7 +106,11 @@ export function AppProvider({ children }) {
 
   const resetApp = useCallback(() => {
     if (processingRef.current) {
-      clearInterval(processingRef.current);
+      if (processingRef.current.abort) {
+        processingRef.current.abort();
+      } else if (typeof processingRef.current === 'number') {
+        clearInterval(processingRef.current);
+      }
       processingRef.current = null;
     }
     if (videoUrl) {
