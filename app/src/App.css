@@ -23,6 +23,7 @@
   letter-spacing: 3px;
   margin: 0;
   text-transform: uppercase;
+  animation: fadeIn 0.5s ease;
 }
 
 /* Main Layout */
@@ -44,6 +45,7 @@
   flex-direction: column;
   gap: 12px;
   padding-top: 8px;
+  animation: slideUp 0.4s ease;
 }
 
 .controls-content {
@@ -63,6 +65,7 @@
   position: relative;
   min-height: 500px;
   display: flex;
+  animation: fadeIn 0.5s ease 0.1s both;
 }
 
 /* Responsive Design */
