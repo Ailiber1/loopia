@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { processVideo, isRifeAvailable } from '../services/videoProcessor';
 
 // App States:
@@ -23,7 +23,13 @@ export function AppProvider({ children }) {
   const [videoLength, setVideoLength] = useState(0);
   const [processingMode, setProcessingMode] = useState(null); // 'rife' or 'minterpolate'
   const [notification, setNotification] = useState(null); // For mode switch notifications
+  const [rifeAvailable, setRifeAvailable] = useState(false);
   const processingRef = useRef(null);
+
+  // Check RIFE availability on mount
+  useEffect(() => {
+    isRifeAvailable().then(setRifeAvailable);
+  }, []);
 
   const uploadVideo = useCallback((file) => {
     setAppState('uploading');
@@ -85,13 +91,10 @@ export function AppProvider({ children }) {
               setProcessingMode('rife');
             } else if (mode === 'minterpolate') {
               setProcessingMode('minterpolate');
-            } else if (mode === 'fallback_rate_limit') {
-              setProcessingMode('minterpolate');
-              setNotification('rateLimitReached');
             } else if (mode === 'fallback_error') {
               setProcessingMode('minterpolate');
               setNotification('rifeFallback');
-            } else if (mode === 'minterpolate_no_api') {
+            } else if (mode === 'minterpolate_no_webgpu') {
               setProcessingMode('minterpolate');
             }
           }
@@ -190,7 +193,7 @@ export function AppProvider({ children }) {
         setVideoLength,
         processingMode,
         notification,
-        isRifeAvailable: isRifeAvailable(),
+        isRifeAvailable: rifeAvailable,
         uploadVideo,
         startProcessing,
         cancelProcessing,
