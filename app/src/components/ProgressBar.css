@@ -1,0 +1,67 @@
+.progress-bar-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 24px;
+  background: linear-gradient(to top, var(--color-surface) 0%, rgba(42, 42, 42, 0.95) 100%);
+  border-top: 1px solid var(--color-border);
+  z-index: 1000;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.progress-bar-container.fade-out {
+  opacity: 0;
+  transform: translateY(100%);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.progress-text {
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.progress-stage {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background-color: var(--color-surface-light);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-accent-hover) 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px var(--color-accent);
+}
+
+.progress-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.estimated-time {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.progress-percent {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
