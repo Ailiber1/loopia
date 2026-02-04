@@ -1,0 +1,24 @@
+.start-button {
+  width: 100%;
+  padding: 16px 24px;
+  background-color: var(--color-accent);
+  color: #1a1a1a;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: var(--border-radius);
+  transition: all var(--transition);
+}
+
+.start-button:hover:not(:disabled) {
+  background-color: var(--color-accent-hover);
+}
+
+.start-button:disabled {
+  background-color: var(--color-surface-light);
+  color: var(--color-text-dim);
+}
+
+.start-button.processing {
+  background-color: var(--color-surface-light);
+  color: var(--color-text-muted);
+}

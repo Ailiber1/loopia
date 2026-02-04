@@ -1,0 +1,27 @@
+.language-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--border-radius);
+  transition: all var(--transition);
+}
+
+.language-toggle:hover {
+  color: var(--color-text);
+  background-color: var(--color-surface-light);
+}
+
+.language-icon {
+  display: flex;
+  align-items: center;
+}
+
+.language-text {
+  min-width: 24px;
+  text-align: center;
+}

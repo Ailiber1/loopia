@@ -1,0 +1,86 @@
+/* LOOPIA Global Styles */
+/* Color Scheme based on spec:
+   - Base: Soft dark gray (#2a2a2a ~ #3a3a3a)
+   - Text: Low contrast (#b0b0b0 ~ #d0d0d0)
+   - Accent: Orange (#ff8c42)
+   - Background: #1a1a1a
+*/
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --color-bg: #1a1a1a;
+  --color-surface: #2a2a2a;
+  --color-surface-light: #3a3a3a;
+  --color-text: #d0d0d0;
+  --color-text-muted: #b0b0b0;
+  --color-text-dim: #707070;
+  --color-accent: #ff8c42;
+  --color-accent-hover: #ff9d5c;
+  --color-danger: #e74c3c;
+  --color-border: #404040;
+
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --border-radius: 8px;
+  --transition: 0.2s ease;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: all var(--transition);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+input, select {
+  font-family: inherit;
+  outline: none;
+  border: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-dim);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
