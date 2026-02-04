@@ -14,9 +14,14 @@
   transition: all var(--transition);
 }
 
-.download-button:hover {
+.download-button:hover:not(.disabled) {
   background-color: var(--color-surface-light);
   color: var(--color-text);
+}
+
+.download-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .download-icon {
