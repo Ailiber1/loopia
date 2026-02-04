@@ -13,16 +13,30 @@
   background-color: var(--color-surface);
   border-radius: 12px;
   color: var(--color-text);
-  border: 1px solid transparent;
+  border: 2px dashed transparent;
   transition: all var(--transition);
 }
 
 .upload-button:hover:not(:disabled) {
   background-color: var(--color-surface-light);
+  border-color: var(--color-border);
+}
+
+.upload-button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .upload-button:disabled {
   opacity: 0.5;
+}
+
+.upload-button.dragging {
+  background-color: rgba(255, 140, 66, 0.1);
+  border-color: var(--color-accent);
+}
+
+.upload-button.dragging .upload-icon {
+  transform: translateY(-4px);
 }
 
 .upload-icon {
@@ -31,6 +45,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
+  transition: transform var(--transition);
 }
 
 .upload-icon svg {
