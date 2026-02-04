@@ -6,12 +6,11 @@ export default function DownloadButton() {
   const { appState, outputVideoUrl } = useApp();
   const { t } = useLanguage();
 
-  // Only show after completion
-  if (appState !== 'completed' || !outputVideoUrl) {
-    return null;
-  }
+  const isCompleted = appState === 'completed' && outputVideoUrl;
 
   const handleDownload = () => {
+    if (!isCompleted) return;
+
     const now = new Date();
     const timestamp = now.toISOString()
       .replace(/[-:]/g, '')
@@ -28,7 +27,11 @@ export default function DownloadButton() {
   };
 
   return (
-    <button className="download-button" onClick={handleDownload}>
+    <button
+      className={`download-button ${!isCompleted ? 'disabled' : ''}`}
+      onClick={handleDownload}
+      disabled={!isCompleted}
+    >
       <span className="download-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />

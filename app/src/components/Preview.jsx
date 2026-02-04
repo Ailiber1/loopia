@@ -5,18 +5,19 @@ import './Preview.css';
 
 export default function Preview() {
   const videoRef = useRef(null);
-  const { appState, videoUrl, outputVideoUrl, videoLength, setVideoLength, duration } = useApp();
+  const { appState, videoUrl, outputVideoUrl, videoLength, setVideoLength, progress } = useApp();
   const { t } = useLanguage();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
 
   const isCompleted = appState === 'completed';
+  const isProcessing = appState === 'processing';
   const displayUrl = isCompleted ? outputVideoUrl : videoUrl;
-  const showVideo = displayUrl && (appState === 'ready' || appState === 'completed');
+  const showVideo = displayUrl && ['ready', 'processing', 'completed'].includes(appState);
 
   useEffect(() => {
-    if (videoRef.current) {
+    if (videoRef.current && displayUrl) {
       const video = videoRef.current;
 
       const handleTimeUpdate = () => {
@@ -55,7 +56,15 @@ export default function Preview() {
     }
   }, [displayUrl, isCompleted, setVideoLength]);
 
+  // Pause video during processing
+  useEffect(() => {
+    if (isProcessing && videoRef.current && isPlaying) {
+      videoRef.current.pause();
+    }
+  }, [isProcessing, isPlaying]);
+
   const handlePlayPause = () => {
+    if (isProcessing) return; // Don't allow play during processing
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -115,7 +124,18 @@ export default function Preview() {
             src={displayUrl}
             className="preview-video"
             playsInline
+            muted={isProcessing}
           />
+
+          {/* Processing overlay */}
+          {isProcessing && (
+            <div className="processing-overlay">
+              <div className="processing-indicator">
+                <div className="processing-spinner"></div>
+                <span className="processing-text">{progress}%</span>
+              </div>
+            </div>
+          )}
 
           {/* Seam jump button (only for completed state) */}
           {isCompleted && (
@@ -133,20 +153,26 @@ export default function Preview() {
             </button>
           )}
 
-          {/* Play/Pause overlay */}
-          <div className="play-overlay" onClick={handlePlayPause}>
-            {!isPlaying && (
-              <div className="play-button">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-              </div>
-            )}
-          </div>
+          {/* Play/Pause overlay (hide during processing) */}
+          {!isProcessing && (
+            <div className="play-overlay" onClick={handlePlayPause}>
+              {!isPlaying && (
+                <div className="play-button">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Video controls */}
           <div className="video-controls">
-            <button className="control-button" onClick={handlePlayPause}>
+            <button
+              className="control-button"
+              onClick={handlePlayPause}
+              disabled={isProcessing}
+            >
               {isPlaying ? (
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="4" width="4" height="16" />
