@@ -189,7 +189,7 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
         '-i', 'seamless_unit.mp4',
         '-t', String(targetSeconds),
         '-c:v', 'libx264',
-        '-crf', '25',           // Moderate compression (23=default, 25=~1.8GB for 60min)
+        '-crf', '27',           // Higher compression (~1.5GB for 60min)
         '-preset', 'fast',
         '-pix_fmt', 'yuv420p',
         '-an',
@@ -331,7 +331,7 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
         '-i', 'seamless_unit.mp4',
         '-t', String(targetSeconds),
         '-c:v', 'libx264',
-        '-crf', '25',           // Moderate compression (23=default, 25=~1.8GB for 60min)
+        '-crf', '27',           // Higher compression (~1.5GB for 60min)
         '-preset', 'fast',
         '-pix_fmt', 'yuv420p',
         '-an',
