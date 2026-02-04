@@ -175,33 +175,22 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
 
     onProgress?.(80);
 
-    // Repeat for target duration (no limit)
+    // Repeat for target duration using -stream_loop (no limit, faster than concat demuxer)
     const targetSeconds = targetMinutes * 60;
-    const repeatCount = Math.ceil(targetSeconds / videoDuration);
+    const seamlessUnitDuration = videoDuration - (bridgeDuration * 0.5) + bridgeDuration;
+    const loopCount = Math.max(0, Math.ceil(targetSeconds / seamlessUnitDuration) - 1);
 
-    if (repeatCount > 1) {
-      let concatList = '';
-      for (let i = 0; i < repeatCount; i++) {
-        concatList += "file 'seamless_unit.mp4'\n";
-      }
-      await ffmpeg.writeFile('final_list.txt', new TextEncoder().encode(concatList));
-
-      await ffmpeg.exec([
-        '-f', 'concat',
-        '-safe', '0',
-        '-i', 'final_list.txt',
-        '-c', 'copy',
-        '-y',
-        outputFileName
-      ]);
-    } else {
-      await ffmpeg.exec([
-        '-i', 'seamless_unit.mp4',
-        '-c', 'copy',
-        '-y',
-        outputFileName
-      ]);
-    }
+    // Use -stream_loop for efficient looping without concat demuxer overhead
+    // -stream_loop N loops the input N additional times (total N+1 plays)
+    // -t limits output to exact target duration
+    await ffmpeg.exec([
+      '-stream_loop', String(loopCount),
+      '-i', 'seamless_unit.mp4',
+      '-t', String(targetSeconds),
+      '-c', 'copy',
+      '-y',
+      outputFileName
+    ]);
 
     onProgress?.(90);
     onStageChange?.('finalizing');
@@ -211,7 +200,7 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
     // Cleanup
     const filesToDelete = [
       inputFileName, 'bridge.mp4', 'main_part.mp4',
-      'concat_list.txt', 'seamless_unit.mp4', 'final_list.txt', outputFileName
+      'concat_list.txt', 'seamless_unit.mp4', outputFileName
     ];
     for (let i = 0; i < rifeResult.frames.length; i++) {
       filesToDelete.push(`frame_${i.toString().padStart(4, '0')}.png`);
@@ -281,10 +270,6 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
     // Short blend duration for faster processing
     const blendDuration = Math.min(BLEND_DURATION, videoDuration * 0.1);
     const targetSeconds = targetMinutes * 60;
-    const repeatCount = Math.ceil(targetSeconds / videoDuration);
-
-    // Limit repeat count for reasonable processing time
-    const maxRepeats = Math.min(repeatCount, 20);
 
     updateProgress(20);
 
@@ -314,33 +299,24 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
 
     onStageChange?.('generatingLoop');
 
-    // Step 2: Fast repeat using concat demuxer with stream copy
-    if (maxRepeats > 1) {
-      let concatList = '';
-      for (let i = 0; i < maxRepeats; i++) {
-        concatList += "file 'seamless_unit.mp4'\n";
-      }
-      await ffmpeg.writeFile('concat_list.txt', new TextEncoder().encode(concatList));
+    // Step 2: Fast repeat using -stream_loop (no limit, faster than concat demuxer)
+    // Calculate seamless unit duration (original - blend overlap)
+    const seamlessUnitDuration = videoDuration - blendDuration;
+    const loopCount = Math.max(0, Math.ceil(targetSeconds / seamlessUnitDuration) - 1);
 
-      updateProgress(60);
+    updateProgress(60);
 
-      // Use stream copy - much faster than re-encoding
-      await ffmpeg.exec([
-        '-f', 'concat',
-        '-safe', '0',
-        '-i', 'concat_list.txt',
-        '-c', 'copy',
-        '-y',
-        outputFileName
-      ]);
-    } else {
-      await ffmpeg.exec([
-        '-i', 'seamless_unit.mp4',
-        '-c', 'copy',
-        '-y',
-        outputFileName
-      ]);
-    }
+    // Use -stream_loop for efficient looping without concat demuxer overhead
+    // -stream_loop N loops the input N additional times (total N+1 plays)
+    // -t limits output to exact target duration
+    await ffmpeg.exec([
+      '-stream_loop', String(loopCount),
+      '-i', 'seamless_unit.mp4',
+      '-t', String(targetSeconds),
+      '-c', 'copy',
+      '-y',
+      outputFileName
+    ]);
 
     updateProgress(90);
     onStageChange?.('finalizing');
@@ -348,7 +324,7 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
     const outputData = await ffmpeg.readFile(outputFileName);
 
     // Cleanup
-    const filesToDelete = [inputFileName, 'seamless_unit.mp4', 'concat_list.txt', outputFileName];
+    const filesToDelete = [inputFileName, 'seamless_unit.mp4', outputFileName];
 
     for (const file of filesToDelete) {
       try { await ffmpeg.deleteFile(file); } catch { /* ignore */ }
