@@ -7,8 +7,10 @@ export default function DownloadButton() {
   const { t } = useLanguage();
 
   const isCompleted = appState === 'completed' && outputVideoUrl;
+  const isMultipleParts = Array.isArray(outputVideoUrl);
+  const partCount = isMultipleParts ? outputVideoUrl.length : 1;
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!isCompleted) return;
 
     const now = new Date();
@@ -16,14 +18,33 @@ export default function DownloadButton() {
       .replace(/[-:]/g, '')
       .replace('T', '_')
       .slice(0, 15);
-    const filename = `LOOPIA_${timestamp}.mp4`;
 
-    const link = document.createElement('a');
-    link.href = outputVideoUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (isMultipleParts) {
+      // Download multiple parts with delay between each
+      for (let i = 0; i < outputVideoUrl.length; i++) {
+        const filename = `LOOPIA_${timestamp}_part${i + 1}.mp4`;
+        const link = document.createElement('a');
+        link.href = outputVideoUrl[i];
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Small delay between downloads to prevent browser blocking
+        if (i < outputVideoUrl.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    } else {
+      // Single file download (original behavior)
+      const filename = `LOOPIA_${timestamp}.mp4`;
+      const link = document.createElement('a');
+      link.href = outputVideoUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   return (
@@ -39,7 +60,10 @@ export default function DownloadButton() {
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
       </span>
-      <span>{t('download')}</span>
+      <span>
+        {t('download')}
+        {isMultipleParts && ` (${partCount})`}
+      </span>
     </button>
   );
 }
