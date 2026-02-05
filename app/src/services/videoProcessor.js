@@ -92,11 +92,28 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
     const bitrateMBps = fileSizeMB / videoDuration; // MB per second
     const targetSeconds = targetMinutes * 60;
     const estimatedOutputMB = bitrateMBps * targetSeconds;
-    const maxOutputMB = 2000; // 2GB limit for browser memory
+    const maxOutputMB = 1800; // 1.8GB target to stay safely under 2GB browser limit
 
-    // Determine if compression is needed based on estimated output size
-    const needsCompression = estimatedOutputMB > maxOutputMB || targetMinutes > 30;
-    console.log(`[VideoProcessor] Bitrate: ${bitrateMBps.toFixed(2)} MB/s, Estimated output: ${estimatedOutputMB.toFixed(0)} MB, Compression: ${needsCompression}`);
+    // Calculate dynamic CRF based on required compression ratio
+    // CRF 23 = baseline, CRF 28 ≈ 40%, CRF 32 ≈ 25%, CRF 36 ≈ 15%
+    let crfValue = null;
+    if (estimatedOutputMB > maxOutputMB) {
+      const requiredRatio = maxOutputMB / estimatedOutputMB;
+      // Map ratio to CRF: lower ratio needs higher CRF
+      if (requiredRatio >= 0.5) {
+        crfValue = '28';
+      } else if (requiredRatio >= 0.3) {
+        crfValue = '32';
+      } else if (requiredRatio >= 0.15) {
+        crfValue = '36';
+      } else {
+        crfValue = '40'; // Maximum compression
+      }
+    } else if (targetMinutes > 30) {
+      crfValue = '28'; // Default compression for long videos
+    }
+    const needsCompression = crfValue !== null;
+    console.log(`[VideoProcessor] Bitrate: ${bitrateMBps.toFixed(2)} MB/s, Estimated: ${estimatedOutputMB.toFixed(0)} MB, CRF: ${crfValue || 'none'}`);
 
     onStageChange?.('interpolatingSeams');
 
@@ -142,9 +159,9 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
     const bridgeDuration = 0.5;
     const fps = Math.max(rifeResult.frames.length / bridgeDuration, 10);
 
-    // Compression args based on bitrate/size detection done earlier
+    // Compression args based on dynamic CRF calculation
     const compressionArgs = needsCompression
-      ? ['-crf', '28']  // Compress to reduce final file size (~1.2GB for 60min)
+      ? ['-crf', crfValue]
       : [];
 
     await ffmpeg.exec([
@@ -286,19 +303,30 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
     const bitrateMBps = fileSizeMB / videoDuration; // MB per second
     const targetSeconds = targetMinutes * 60;
     const estimatedOutputMB = bitrateMBps * targetSeconds;
-    const maxOutputMB = 2000; // 2GB limit for browser memory
+    const maxOutputMB = 1800; // 1.8GB target to stay safely under 2GB browser limit
 
-    // Determine if compression is needed based on estimated output size
-    const needsCompression = estimatedOutputMB > maxOutputMB || targetMinutes > 30;
-    console.log(`[VideoProcessor] Crossfade - Bitrate: ${bitrateMBps.toFixed(2)} MB/s, Estimated output: ${estimatedOutputMB.toFixed(0)} MB, Compression: ${needsCompression}`);
+    // Calculate dynamic CRF based on required compression ratio
+    let crfValue = '23'; // Default (no significant compression)
+    if (estimatedOutputMB > maxOutputMB) {
+      const requiredRatio = maxOutputMB / estimatedOutputMB;
+      if (requiredRatio >= 0.5) {
+        crfValue = '28';
+      } else if (requiredRatio >= 0.3) {
+        crfValue = '32';
+      } else if (requiredRatio >= 0.15) {
+        crfValue = '36';
+      } else {
+        crfValue = '40';
+      }
+    } else if (targetMinutes > 30) {
+      crfValue = '28';
+    }
+    console.log(`[VideoProcessor] Crossfade - Bitrate: ${bitrateMBps.toFixed(2)} MB/s, Estimated: ${estimatedOutputMB.toFixed(0)} MB, CRF: ${crfValue}`);
 
     onStageChange?.('interpolatingSeams');
 
     // Short blend duration for faster processing
     const blendDuration = Math.min(BLEND_DURATION, videoDuration * 0.1);
-
-    // Compression based on bitrate/size detection
-    const crfValue = needsCompression ? '28' : '23';
 
     updateProgress(20);
 
