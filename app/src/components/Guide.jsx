@@ -214,6 +214,23 @@ export default function Guide() {
                   )}
                 </div>
               ))}
+
+              {/* Specification Download */}
+              <div className="guide-section guide-download-section">
+                <h3>{language === 'ja' ? '📄 仕様書ダウンロード' : '📄 Download Specification'}</h3>
+                <p className="guide-download-desc">
+                  {language === 'ja'
+                    ? 'このアプリの完全な技術仕様書をダウンロードできます。'
+                    : 'Download the complete technical specification for this app.'}
+                </p>
+                <a
+                  href={`${import.meta.env.BASE_URL}LOOPIA_SPECIFICATION.md`}
+                  download="LOOPIA_SPECIFICATION.md"
+                  className="guide-download-button"
+                >
+                  {language === 'ja' ? '仕様書をダウンロード (.md)' : 'Download Specification (.md)'}
+                </a>
+              </div>
             </div>
           </div>
         </div>
