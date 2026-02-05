@@ -265,34 +265,3 @@
   border-left: 3px solid #f97316;
 }
 
-/* Download Section */
-.guide-download-section {
-  margin-top: 12px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.guide-download-desc {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13px;
-  margin: 0 0 16px 0;
-}
-
-.guide-download-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  background: linear-gradient(135deg, #f97316, #fb923c);
-  color: #fff;
-  text-decoration: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.guide-download-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
-}
