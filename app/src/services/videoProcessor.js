@@ -87,6 +87,17 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
     URL.revokeObjectURL(video.src);
     onProgress?.(10);
 
+    // Calculate bitrate and estimate output size
+    const fileSizeMB = videoFile.size / (1024 * 1024);
+    const bitrateMBps = fileSizeMB / videoDuration; // MB per second
+    const targetSeconds = targetMinutes * 60;
+    const estimatedOutputMB = bitrateMBps * targetSeconds;
+    const maxOutputMB = 2000; // 2GB limit for browser memory
+
+    // Determine if compression is needed based on estimated output size
+    const needsCompression = estimatedOutputMB > maxOutputMB || targetMinutes > 30;
+    console.log(`[VideoProcessor] Bitrate: ${bitrateMBps.toFixed(2)} MB/s, Estimated output: ${estimatedOutputMB.toFixed(0)} MB, Compression: ${needsCompression}`);
+
     onStageChange?.('interpolatingSeams');
 
     // Create RIFE bridge using ONNX (in-browser AI)
@@ -130,11 +141,8 @@ async function createSeamlessLoopWithRifeOnnx(videoFile, targetMinutes, onStageC
     // Create bridge video from frames
     const bridgeDuration = 0.5;
     const fps = Math.max(rifeResult.frames.length / bridgeDuration, 10);
-    const targetSeconds = targetMinutes * 60;
-    const needsCompression = targetMinutes > 30;
 
-    // For 60min: compress during seamless_unit creation (short video = fast)
-    // Then use -c copy for loop expansion (no re-encoding of 60min video)
+    // Compression args based on bitrate/size detection done earlier
     const compressionArgs = needsCompression
       ? ['-crf', '28']  // Compress to reduce final file size (~1.2GB for 60min)
       : [];
@@ -273,15 +281,23 @@ async function createSeamlessLoopWithCrossfade(videoFile, targetMinutes, onStage
     URL.revokeObjectURL(video.src);
     updateProgress(15);
 
+    // Calculate bitrate and estimate output size
+    const fileSizeMB = videoFile.size / (1024 * 1024);
+    const bitrateMBps = fileSizeMB / videoDuration; // MB per second
+    const targetSeconds = targetMinutes * 60;
+    const estimatedOutputMB = bitrateMBps * targetSeconds;
+    const maxOutputMB = 2000; // 2GB limit for browser memory
+
+    // Determine if compression is needed based on estimated output size
+    const needsCompression = estimatedOutputMB > maxOutputMB || targetMinutes > 30;
+    console.log(`[VideoProcessor] Crossfade - Bitrate: ${bitrateMBps.toFixed(2)} MB/s, Estimated output: ${estimatedOutputMB.toFixed(0)} MB, Compression: ${needsCompression}`);
+
     onStageChange?.('interpolatingSeams');
 
     // Short blend duration for faster processing
     const blendDuration = Math.min(BLEND_DURATION, videoDuration * 0.1);
-    const targetSeconds = targetMinutes * 60;
-    const needsCompression = targetMinutes > 30;
 
-    // For 60min: compress during seamless_unit creation (short video = fast)
-    // Then use -c copy for loop expansion (no re-encoding of 60min video)
+    // Compression based on bitrate/size detection
     const crfValue = needsCompression ? '28' : '23';
 
     updateProgress(20);
