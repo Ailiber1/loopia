@@ -31,7 +31,24 @@ export default function Guide() {
         note: '4Kの60分はメモリ制限により失敗する可能性があります'
       },
       {
-        title: '3. ループしやすい素材の特徴',
+        title: '3. 高ビットレート素材の注意点',
+        warning: {
+          title: '⚠️ 高ビットレートとは？',
+          desc: '短い動画なのにファイルサイズが大きい場合は「高ビットレート」です。',
+          example: '例：4秒で16MB → 高ビットレート（4MB/秒）'
+        },
+        bitrateTable: {
+          headers: ['素材', '10分', '30分', '画質'],
+          rows: [
+            ['通常（1MB/秒以下）', '◎', '◎', '劣化なし'],
+            ['高（2-3MB/秒）', '◎', '○', '若干劣化'],
+            ['非常に高（4MB/秒以上）', '○', '△', '圧縮による劣化あり'],
+          ]
+        },
+        note: '高ビットレート素材で30分以上を生成すると、自動圧縮により画質が低下します。特に暗い背景や炎などの動きが多い映像で目立ちます。'
+      },
+      {
+        title: '4. ループしやすい素材の特徴',
         good: {
           title: '✅ おすすめ',
           items: [
@@ -52,7 +69,7 @@ export default function Guide() {
         }
       },
       {
-        title: '4. おすすめの元素材例',
+        title: '5. おすすめの元素材例',
         examples: [
           { icon: '🌊', name: '波・海', desc: '繰り返しの動きが自然' },
           { icon: '☁️', name: '雲・空', desc: 'ゆっくりした流れ' },
@@ -87,7 +104,24 @@ export default function Guide() {
         note: '4K 60min may fail due to browser memory limits'
       },
       {
-        title: '3. Best Videos for Looping',
+        title: '3. High Bitrate Source Warning',
+        warning: {
+          title: '⚠️ What is High Bitrate?',
+          desc: 'If a short video has a large file size, it\'s "high bitrate".',
+          example: 'Example: 4 sec / 16MB = High bitrate (4MB/sec)'
+        },
+        bitrateTable: {
+          headers: ['Source', '10 min', '30 min', 'Quality'],
+          rows: [
+            ['Normal (≤1MB/sec)', '◎', '◎', 'No loss'],
+            ['High (2-3MB/sec)', '◎', '○', 'Slight loss'],
+            ['Very High (≥4MB/sec)', '○', '△', 'Compressed'],
+          ]
+        },
+        note: 'High bitrate sources over 30min will be auto-compressed, causing visible quality loss, especially in dark backgrounds and fire/motion.'
+      },
+      {
+        title: '4. Best Videos for Looping',
         good: {
           title: '✅ Recommended',
           items: [
@@ -108,7 +142,7 @@ export default function Guide() {
         }
       },
       {
-        title: '4. Great Source Material Examples',
+        title: '5. Great Source Material Examples',
         examples: [
           { icon: '🌊', name: 'Waves/Ocean', desc: 'Natural repetitive motion' },
           { icon: '☁️', name: 'Clouds/Sky', desc: 'Slow flowing movement' },
@@ -163,6 +197,37 @@ export default function Guide() {
                         </thead>
                         <tbody>
                           {section.table.rows.map((row, i) => (
+                            <tr key={i}>
+                              {row.map((cell, j) => (
+                                <td key={j}>{cell}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {section.warning && (
+                    <div className="guide-warning">
+                      <h4>{section.warning.title}</h4>
+                      <p>{section.warning.desc}</p>
+                      <code>{section.warning.example}</code>
+                    </div>
+                  )}
+
+                  {section.bitrateTable && (
+                    <div className="guide-table-wrapper">
+                      <table className="guide-table guide-bitrate-table">
+                        <thead>
+                          <tr>
+                            {section.bitrateTable.headers.map((h, i) => (
+                              <th key={i}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {section.bitrateTable.rows.map((row, i) => (
                             <tr key={i}>
                               {row.map((cell, j) => (
                                 <td key={j}>{cell}</td>
